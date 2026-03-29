@@ -175,6 +175,7 @@ export interface ConnectedEvent extends BaseEvent {
   chat_active: boolean;
   conversation_id: number | null;
   frame_id: number | null;
+  device_name: string | null;
   media_state: {
     state: 'stopped' | 'playing' | 'paused';
     current_track: MediaStateEvent['current_track'];
@@ -262,13 +263,26 @@ class WebSocketManager {
     this._intentionalClose = false;
     this.isConnecting = true;
     this.setStatus('connecting');
+
+    const params = new URLSearchParams({ token: this.token! });
+    if (window.electron?.device) {
+      try {
+        const hostname = await window.electron.device.getHostname();
+        if (hostname) params.set('hostname', hostname);
+        const platform = await window.electron.device.getPlatform();
+        if (platform) params.set('platform', platform);
+      } catch {
+        // Non-Electron environment — skip device info
+      }
+    }
+
     this.connectionPromise = new Promise((resolve, reject) => {
       // Convert http(s) to ws(s)
       const wsUrl = config.apiBaseUrl
         .replace(/^http:/, 'ws:')
         .replace(/^https:/, 'wss:');
 
-      const url = `${wsUrl}/ws/chat?token=${encodeURIComponent(this.token!)}`;
+      const url = `${wsUrl}/ws/chat?${params.toString()}`;
       this.ws = new WebSocket(url);
 
       this.ws.onopen = () => {
@@ -485,8 +499,8 @@ class WebSocketManager {
   /**
    * Register client-side tool schemas with the backend.
    */
-  sendClientToolsRegister(tools: Array<{ type: string; function: { name: string; description: string; parameters: Record<string, unknown> } }>) {
-    this.send({ type: 'client_tools_register', tools });
+  sendClientToolsRegister(tools: Array<{ type: string; function: { name: string; description: string; parameters: Record<string, unknown> } }>, deviceName?: string) {
+    this.send({ type: 'client_tools_register', tools, device_name: deviceName || undefined });
   }
 
   /**

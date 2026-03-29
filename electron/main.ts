@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, protocol, shell, Tray, Menu, nativeImage } from 'electron';
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
 import https from 'https';
 import http from 'http';
 import { spawn } from 'child_process';
@@ -444,6 +445,16 @@ app.whenReady().then(() => {
   registerHostToolIPC();
   registerAppToolIPC();
   registerExplorerIPC();
+
+  // Device identification IPC
+  ipcMain.handle('device:get-hostname', () => os.hostname());
+  ipcMain.handle('device:get-platform', () => {
+    const map: Record<string, string> = {
+      win32: 'windows', linux: 'linux', darwin: 'macos',
+    };
+    return map[process.platform] || process.platform;
+  });
+
   startMcpServer();
 
   // Auto-updater (no-op in dev mode — no update server configured)

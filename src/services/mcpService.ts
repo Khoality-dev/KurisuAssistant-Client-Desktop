@@ -19,6 +19,7 @@ import { initAppToolsHandler } from './appToolsHandler';
 let initialized = false;
 let toolCallHandler: ((event: ToolCallRequestEvent) => void) | null = null;
 let clientTools: Array<{ type: string; function: { name: string; description: string; parameters: Record<string, unknown> } }> = [];
+let cachedHostname: string | undefined;
 
 /**
  * Initialize client-side MCP servers and register tools with backend.
@@ -28,6 +29,10 @@ export async function initClientMCPServers(): Promise<void> {
   if (!window.electron) {
     // Not running in Electron — skip
     return;
+  }
+
+  if (!cachedHostname && window.electron?.device) {
+    try { cachedHostname = await window.electron.device.getHostname(); } catch { /* ignore */ }
   }
 
   // Always collect built-in tools (host, app) regardless of MCP state
@@ -90,7 +95,7 @@ export async function initClientMCPServers(): Promise<void> {
     clientTools = [...builtinTools, ...mcpTools];
 
     // Register all client tools with backend
-    wsManager.sendClientToolsRegister(clientTools);
+    wsManager.sendClientToolsRegister(clientTools, cachedHostname);
 
     // Set up handler for incoming tool call requests
     setupToolCallHandler();
@@ -103,7 +108,7 @@ export async function initClientMCPServers(): Promise<void> {
     // Still register built-in tools even if MCP init fails
     if (builtinTools.length > 0 && !initialized) {
       clientTools = builtinTools;
-      wsManager.sendClientToolsRegister(clientTools);
+      wsManager.sendClientToolsRegister(clientTools, cachedHostname);
       setupToolCallHandler();
       initAppToolsHandler();
       initialized = true;

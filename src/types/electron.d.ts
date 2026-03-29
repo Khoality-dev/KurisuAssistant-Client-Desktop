@@ -103,9 +103,15 @@ export interface ExtensionsAPI {
   onDownloadProgress: (cb: (progress: { percent: number }) => void) => () => void;
 }
 
+export interface DeviceAPI {
+  getHostname: () => Promise<string>;
+  getPlatform: () => Promise<string>;
+}
+
 export interface ElectronAPI {
   platform: string;
   openPath: (filePath: string) => Promise<string>;
+  device: DeviceAPI;
   onMCPToolsChanged: (cb: () => void) => () => void;
   appTools: AppToolsAPI;
   hostTools: HostToolsAPI;

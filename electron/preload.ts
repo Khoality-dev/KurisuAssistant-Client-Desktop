@@ -5,6 +5,11 @@ contextBridge.exposeInMainWorld('electron', {
   openExternal: (url: string) => ipcRenderer.invoke('shell:open-external', url),
   openPath: (filePath: string) => ipcRenderer.invoke('shell:open-path', filePath),
 
+  device: {
+    getHostname: () => ipcRenderer.invoke('device:get-hostname'),
+    getPlatform: () => ipcRenderer.invoke('device:get-platform'),
+  },
+
   updater: {
     onUpdateAvailable: (cb: (info: { version: string }) => void) => {
       const handler = (_event: Electron.IpcRendererEvent, info: { version: string }) => cb(info);
