@@ -39,7 +39,7 @@ export function useCharacterPanel({
     if (!forceRefresh && agentCacheRef.current.has(agentId)) return;
     agentCacheRef.current.add(agentId);
     apiClient.getAgent(agentId).then((agent) => {
-      const cc = agent.persona?.character_config;
+      const cc = agent.character_config;
       const poseTree = cc?.pose_tree ?? null;
       // Migrate legacy video_url to video_urls on edges
       if (poseTree?.edges) {

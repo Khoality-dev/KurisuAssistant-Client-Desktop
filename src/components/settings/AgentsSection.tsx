@@ -37,7 +37,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { apiClient } from '../../api/client';
 import { useAgentStore } from '../../store/agentStore';
 import { storage } from '../../utils/storage';
-import type { Agent, AgentCreate, AgentUpdate, Tool, Persona } from '../../api/types';
+import type { Agent, AgentCreate, AgentUpdate, Tool } from '../../api/types';
 import { ModelPicker } from '../ModelPicker';
 import { ToolGroupChecklist, buildToolGroups } from './ToolGroupChecklist';
 import { AgentEditDialog } from './AgentEditDialog';
@@ -49,14 +49,19 @@ const INTERNAL_TOOLS = ['route_to_agent', 'route_to_user', 'play_music', 'music_
 
 interface AgentFormData {
   name: string;
+  description: string;
   system_prompt: string;
   model_name: string;
   think: boolean;
   available_tools: string[] | null;
   memory: string;
   memory_enabled: boolean;
-  persona_id: number | null;
   use_deferred_tools: boolean;
+  agent_type: string;
+  // Personality fields (merged from Persona)
+  voice_reference: string | null;
+  avatar_uuid: string | null;
+  preferred_name: string | null;
 }
 
 export const AgentsSection: React.FC = () => {
@@ -78,16 +83,19 @@ export const AgentsSection: React.FC = () => {
   // Form data
   const [formData, setFormData] = useState<AgentFormData>({
     name: '',
+    description: '',
     system_prompt: '',
     model_name: '',
     think: false,
     available_tools: null,
     memory: '',
     memory_enabled: true,
-    persona_id: null,
     use_deferred_tools: false,
+    agent_type: 'main',
+    voice_reference: null,
+    avatar_uuid: null,
+    preferred_name: null,
   });
-  const [personas, setPersonas] = useState<Persona[]>([]);
 
   const [isPromptEditorExpanded, setIsPromptEditorExpanded] = useState(false);
 
@@ -97,17 +105,7 @@ export const AgentsSection: React.FC = () => {
     loadAgents();
     loadModels();
     loadTools();
-    loadPersonas();
   }, []);
-
-  const loadPersonas = async () => {
-    try {
-      const data = await apiClient.listPersonas();
-      setPersonas(data);
-    } catch (err: any) {
-      console.error('Failed to load personas:', err);
-    }
-  };
 
   const loadModels = async () => {
     try {
@@ -172,13 +170,17 @@ export const AgentsSection: React.FC = () => {
       const provider = models.find(m => m.name === modelName)?.provider || 'ollama';
       const createData: AgentCreate = {
         name: formData.name,
+        description: formData.description || undefined,
         system_prompt: formData.system_prompt || undefined,
         model_name: modelName,
         provider_type: provider,
         think: formData.think,
         available_tools: formData.available_tools ?? undefined,
-        persona_id: formData.persona_id || undefined,
         use_deferred_tools: formData.use_deferred_tools || undefined,
+        agent_type: formData.agent_type,
+        voice_reference: formData.voice_reference || undefined,
+        avatar_uuid: formData.avatar_uuid || undefined,
+        preferred_name: formData.preferred_name || undefined,
       };
 
       const newAgent = await apiClient.createAgent(createData);
@@ -201,15 +203,19 @@ export const AgentsSection: React.FC = () => {
       const normalizedModelName = formData.model_name.trim();
       const updateData: AgentUpdate = {
         name: formData.name !== selectedAgent.name ? formData.name : undefined,
+        description: formData.description !== selectedAgent.description ? formData.description : undefined,
         system_prompt: formData.system_prompt !== selectedAgent.system_prompt ? formData.system_prompt : undefined,
         model_name: normalizedModelName !== (selectedAgent.model_name || '') ? normalizedModelName : undefined,
         provider_type: models.find(m => m.name === normalizedModelName)?.provider || 'ollama',
         think: formData.think !== selectedAgent.think ? formData.think : undefined,
-        available_tools: toolsChanged ? formData.available_tools : undefined,
+        available_tools: toolsChanged ? (formData.available_tools ?? undefined) : undefined,
         memory: formData.memory !== (selectedAgent.memory || '') ? formData.memory : undefined,
         memory_enabled: formData.memory_enabled !== selectedAgent.memory_enabled ? formData.memory_enabled : undefined,
-        persona_id: formData.persona_id !== selectedAgent.persona_id ? formData.persona_id : undefined,
         use_deferred_tools: formData.use_deferred_tools !== selectedAgent.use_deferred_tools ? formData.use_deferred_tools : undefined,
+        agent_type: formData.agent_type !== selectedAgent.agent_type ? formData.agent_type : undefined,
+        voice_reference: formData.voice_reference !== selectedAgent.voice_reference ? formData.voice_reference : undefined,
+        avatar_uuid: formData.avatar_uuid !== selectedAgent.avatar_uuid ? formData.avatar_uuid : undefined,
+        preferred_name: formData.preferred_name !== selectedAgent.preferred_name ? formData.preferred_name : undefined,
       };
 
       // Only send fields that changed
@@ -276,14 +282,18 @@ export const AgentsSection: React.FC = () => {
   const resetForm = () => {
     setFormData({
       name: '',
+      description: '',
       system_prompt: '',
       model_name: '',
       think: false,
       available_tools: null,
       memory: '',
       memory_enabled: true,
-      persona_id: null,
       use_deferred_tools: false,
+      agent_type: 'main',
+      voice_reference: null,
+      avatar_uuid: null,
+      preferred_name: null,
     });
     setSelectedAgent(null);
     setIsPromptEditorExpanded(false);
@@ -293,14 +303,18 @@ export const AgentsSection: React.FC = () => {
     setSelectedAgent(agent);
     setFormData({
       name: agent.name,
+      description: agent.description || '',
       system_prompt: agent.system_prompt || '',
       model_name: agent.model_name || '',
       think: agent.think,
       available_tools: agent.available_tools ?? null,
       memory: agent.memory || '',
       memory_enabled: agent.memory_enabled,
-      persona_id: agent.persona_id || null,
       use_deferred_tools: agent.use_deferred_tools ?? false,
+      agent_type: agent.agent_type || 'main',
+      voice_reference: agent.voice_reference || null,
+      avatar_uuid: agent.avatar_uuid || null,
+      preferred_name: agent.preferred_name || null,
     });
     setIsPromptEditorExpanded(false);
     setEditDialogOpen(true);
@@ -452,9 +466,9 @@ export const AgentsSection: React.FC = () => {
                     <Typography variant="h6" gutterBottom>
                       {agent.name}
                     </Typography>
-                    {agent.persona?.name && (
+                    {agent.description && (
                       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                        Persona: {agent.persona.name}
+                        {agent.description}
                       </Typography>
                     )}
                     <Typography
@@ -543,18 +557,25 @@ export const AgentsSection: React.FC = () => {
               helperText="A unique name for this agent (e.g., 'Kurisu')"
             />
 
-            {/* Persona */}
+            {/* Description */}
+            <TextField
+              label="Description"
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              fullWidth
+              helperText="Brief description of this agent's role (used for routing)"
+            />
+
+            {/* Agent Type */}
             <FormControl fullWidth>
-              <InputLabel>Persona</InputLabel>
+              <InputLabel>Agent Type</InputLabel>
               <Select
-                value={formData.persona_id ?? ''}
-                label="Persona"
-                onChange={(e) => setFormData({ ...formData, persona_id: e.target.value === '' ? null : Number(e.target.value) })}
+                value={formData.agent_type}
+                label="Agent Type"
+                onChange={(e) => setFormData({ ...formData, agent_type: e.target.value })}
               >
-                <MenuItem value="">None</MenuItem>
-                {personas.map((p) => (
-                  <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>
-                ))}
+                <MenuItem value="main">Main Agent (has personality)</MenuItem>
+                <MenuItem value="sub">Sub-agent (tool only)</MenuItem>
               </Select>
             </FormControl>
 
@@ -633,7 +654,6 @@ export const AgentsSection: React.FC = () => {
         isPromptEditorExpanded={isPromptEditorExpanded}
         setIsPromptEditorExpanded={setIsPromptEditorExpanded}
         models={models}
-        personas={personas}
         toolGroups={toolGroups}
         onSave={handleUpdateAgent}
         onRefreshModels={loadModels}

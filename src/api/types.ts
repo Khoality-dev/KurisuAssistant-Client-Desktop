@@ -161,8 +161,12 @@ export interface Agent {
   enabled: boolean;
   is_system: boolean;
   use_deferred_tools: boolean;
-  persona_id: number | null;
-  persona: Persona | null;
+  agent_type: string;  // "main" or "sub"
+  // Personality fields (merged from Persona)
+  voice_reference: string | null;
+  avatar_uuid: string | null;
+  character_config: CharacterConfigDTO | null;
+  preferred_name: string | null;
 }
 
 // Character asset types (backend responses)
@@ -195,17 +199,24 @@ export interface UploadVideoResponseDTO {
 
 export interface AgentCreate {
   name: string;
+  description?: string;
   system_prompt?: string;
   model_name: string;
   provider_type?: string;
   available_tools?: string[];
   think?: boolean;
-  persona_id?: number;
   use_deferred_tools?: boolean;
+  agent_type?: string;  // "main" or "sub"
+  // Personality fields
+  voice_reference?: string;
+  avatar_uuid?: string;
+  character_config?: CharacterConfigDTO;
+  preferred_name?: string;
 }
 
 export interface AgentUpdate {
   name?: string;
+  description?: string;
   system_prompt?: string;
   model_name?: string;
   provider_type?: string;
@@ -213,8 +224,13 @@ export interface AgentUpdate {
   think?: boolean;
   memory?: string;
   memory_enabled?: boolean;
-  persona_id?: number | null;
   use_deferred_tools?: boolean;
+  agent_type?: string;
+  // Personality fields
+  voice_reference?: string | null;
+  avatar_uuid?: string | null;
+  character_config?: CharacterConfigDTO | null;
+  preferred_name?: string | null;
 }
 
 // MCP Server types

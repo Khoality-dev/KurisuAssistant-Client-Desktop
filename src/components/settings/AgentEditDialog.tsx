@@ -25,7 +25,6 @@ import {
 import { ModelPicker } from '../ModelPicker';
 import { ToolGroupChecklist } from './ToolGroupChecklist';
 import type { ToolGroup } from './ToolGroupChecklist';
-import type { Persona } from '../../api/types';
 
 const formSectionSx = {
   p: 2.5,
@@ -38,14 +37,18 @@ const formSectionSx = {
 
 interface AgentFormData {
   name: string;
+  description: string;
   system_prompt: string;
   model_name: string;
   think: boolean;
   available_tools: string[] | null;
   memory: string;
   memory_enabled: boolean;
-  persona_id: number | null;
   use_deferred_tools: boolean;
+  agent_type: string;
+  voice_reference: string | null;
+  avatar_uuid: string | null;
+  preferred_name: string | null;
 }
 
 interface AgentEditDialogProps {
@@ -57,7 +60,6 @@ interface AgentEditDialogProps {
   isPromptEditorExpanded: boolean;
   setIsPromptEditorExpanded: (value: boolean | ((current: boolean) => boolean)) => void;
   models: Array<{ name: string; provider: string }>;
-  personas: Persona[];
   toolGroups: ToolGroup[];
   onSave: () => void;
   onRefreshModels: () => Promise<void>;
@@ -74,7 +76,6 @@ export const AgentEditDialog: React.FC<AgentEditDialogProps> = ({
   isPromptEditorExpanded,
   setIsPromptEditorExpanded,
   models,
-  personas,
   toolGroups,
   onSave,
   onRefreshModels,
@@ -129,17 +130,22 @@ export const AgentEditDialog: React.FC<AgentEditDialogProps> = ({
                 disabled={isAdministrator}
                 helperText={isAdministrator ? 'Administrator name cannot be changed' : 'Display name used across the app'}
               />
+              <TextField
+                label="Description"
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                fullWidth
+                helperText="Brief description of this agent's role (used for routing)"
+              />
               <FormControl fullWidth>
-                <InputLabel>Persona</InputLabel>
+                <InputLabel>Agent Type</InputLabel>
                 <Select
-                  value={formData.persona_id ?? ''}
-                  label="Persona"
-                  onChange={(e) => setFormData({ ...formData, persona_id: e.target.value === '' ? null : Number(e.target.value) })}
+                  value={formData.agent_type}
+                  label="Agent Type"
+                  onChange={(e) => setFormData({ ...formData, agent_type: e.target.value })}
                 >
-                  <MenuItem value="">None</MenuItem>
-                  {personas.map((p) => (
-                    <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>
-                  ))}
+                  <MenuItem value="main">Main Agent (has personality)</MenuItem>
+                  <MenuItem value="sub">Sub-agent (tool only)</MenuItem>
                 </Select>
               </FormControl>
             </Box>
