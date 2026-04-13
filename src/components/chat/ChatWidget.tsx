@@ -33,6 +33,7 @@ import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import { AnimatePresence } from 'framer-motion';
 import { useConversationStore } from '../../store/conversationStore';
 import { useAuthStore } from '../../store/authStore';
+import { apiClient } from '../../api/client';
 
 import { useTTS } from '../../hooks/useTTS';
 import { useVisionStore } from '../../store/visionStore';
@@ -73,6 +74,24 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ characterWindowOpen = fa
   const [displayMode, setDisplayMode] = useState<'all' | 'context'>('all');
   const [contextBannerExpanded, setContextBannerExpanded] = useState(false);
   const [breakdownDialogOpen, setBreakdownDialogOpen] = useState(false);
+  const [breakdownData, setBreakdownData] = useState<{
+    agent_name: string;
+    system_prompt_tokens: number;
+    memory_tokens: number;
+    compacted_context_tokens: number;
+    skills_tokens: number;
+    tools_guidance_tokens: number;
+    other_agents_tokens: number;
+    message_history_tokens: number;
+    message_count: number;
+    tool_schemas_tokens: number;
+    tool_count: number;
+    total_tokens: number;
+    context_limit: number;
+    loaded_tools: string[];
+    loaded_skills: string[];
+  } | null>(null);
+  const [breakdownLoading, setBreakdownLoading] = useState(false);
 
   // Message search
   const [searchOpen, setSearchOpen] = useState(false);
@@ -158,6 +177,23 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ characterWindowOpen = fa
     setDisplayMode('all');
     setContextBannerExpanded(false);
   }, [currentConversation?.id]);
+
+  // Fetch context breakdown when dialog opens
+  useEffect(() => {
+    if (!breakdownDialogOpen || !currentConversation?.id) return;
+    setBreakdownLoading(true);
+    apiClient.getContextBreakdown(currentConversation.id, agentId ?? undefined)
+      .then((data) => {
+        setBreakdownData(data);
+      })
+      .catch((err) => {
+        console.error('Failed to fetch context breakdown:', err);
+        setBreakdownData(null);
+      })
+      .finally(() => {
+        setBreakdownLoading(false);
+      });
+  }, [breakdownDialogOpen, currentConversation?.id, agentId]);
 
   // Scroll to bottom when switching display mode (after render settles)
   useEffect(() => {
@@ -457,7 +493,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ characterWindowOpen = fa
             >
               {tokenCount.toLocaleString()} / {contextSize.toLocaleString()} tokens
             </Typography>
-            {streaming.contextBreakdown && (
+            {currentConversation && (
               <Tooltip title="View context breakdown">
                 <IconButton
                   size="small"
@@ -527,16 +563,12 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ characterWindowOpen = fa
             detail: Object.entries(streaming.pendingApproval!.tool_args)
               .map(([k, v]) => `${k}: ${typeof v === 'string' ? v : JSON.stringify(v)}`)
               .join('\n'),
-            riskLevel: streaming.pendingApproval!.risk_level,
+            executionLocation: streaming.pendingApproval!.execution_location,
             agentName: streaming.pendingApproval!.name || undefined,
-            options: [
-              { label: 'Accept', value: 'approve', color: 'success' },
-              { label: 'Deny', value: 'deny', color: 'error' },
-            ],
           }}
           onRespond={hostApproval
             ? handleHostApprovalRespond
-            : (value) => streaming.respondToApproval(value === 'approve')
+            : (value) => streaming.respondToApproval(value)
           }
         />
       ) : asr.interactionActive ? (
@@ -598,35 +630,42 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ characterWindowOpen = fa
         fullWidth
       >
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          Context Breakdown
+          Context Breakdown {breakdownData?.agent_name ? `- ${breakdownData.agent_name}` : ''}
           <IconButton size="small" onClick={() => setBreakdownDialogOpen(false)}>
             <CloseIcon fontSize="small" />
           </IconButton>
         </DialogTitle>
         <DialogContent>
-          {streaming.contextBreakdown ? (
+          {breakdownLoading ? (
+            <Box sx={{ py: 4 }}>
+              <LinearProgress />
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 2, textAlign: 'center' }}>
+                Loading context breakdown...
+              </Typography>
+            </Box>
+          ) : breakdownData ? (
             <Box>
               {/* Progress bar */}
               <Box sx={{ mb: 2 }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
                   <Typography variant="body2">
-                    {streaming.contextBreakdown.total_tokens.toLocaleString()} / {streaming.contextBreakdown.context_limit.toLocaleString()} tokens
+                    {breakdownData.total_tokens.toLocaleString()} / {breakdownData.context_limit.toLocaleString()} tokens
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    {Math.round((streaming.contextBreakdown.total_tokens / streaming.contextBreakdown.context_limit) * 100)}%
+                    {Math.round((breakdownData.total_tokens / breakdownData.context_limit) * 100)}%
                   </Typography>
                 </Box>
                 <LinearProgress
                   variant="determinate"
-                  value={Math.min(100, (streaming.contextBreakdown.total_tokens / streaming.contextBreakdown.context_limit) * 100)}
+                  value={Math.min(100, (breakdownData.total_tokens / breakdownData.context_limit) * 100)}
                   sx={{
                     height: 8,
                     borderRadius: 1,
                     backgroundColor: 'action.hover',
                     '& .MuiLinearProgress-bar': {
-                      backgroundColor: streaming.contextBreakdown.total_tokens > streaming.contextBreakdown.context_limit * 0.9
+                      backgroundColor: breakdownData.total_tokens > breakdownData.context_limit * 0.9
                         ? 'error.main'
-                        : streaming.contextBreakdown.total_tokens > streaming.contextBreakdown.context_limit * 0.8
+                        : breakdownData.total_tokens > breakdownData.context_limit * 0.8
                         ? 'warning.main'
                         : 'primary.main',
                     },
@@ -640,59 +679,59 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ characterWindowOpen = fa
                 <TableBody>
                   <TableRow>
                     <TableCell>System Prompt</TableCell>
-                    <TableCell align="right">{streaming.contextBreakdown.system_prompt_tokens.toLocaleString()}</TableCell>
+                    <TableCell align="right">{breakdownData.system_prompt_tokens.toLocaleString()}</TableCell>
                   </TableRow>
-                  {streaming.contextBreakdown.memory_tokens > 0 && (
+                  {breakdownData.memory_tokens > 0 && (
                     <TableRow>
                       <TableCell>Agent Memory</TableCell>
-                      <TableCell align="right">{streaming.contextBreakdown.memory_tokens.toLocaleString()}</TableCell>
+                      <TableCell align="right">{breakdownData.memory_tokens.toLocaleString()}</TableCell>
                     </TableRow>
                   )}
-                  {streaming.contextBreakdown.compacted_context_tokens > 0 && (
+                  {breakdownData.compacted_context_tokens > 0 && (
                     <TableRow>
                       <TableCell>Compacted Context</TableCell>
-                      <TableCell align="right">{streaming.contextBreakdown.compacted_context_tokens.toLocaleString()}</TableCell>
+                      <TableCell align="right">{breakdownData.compacted_context_tokens.toLocaleString()}</TableCell>
                     </TableRow>
                   )}
-                  {streaming.contextBreakdown.skills_tokens > 0 && (
+                  {breakdownData.skills_tokens > 0 && (
                     <TableRow>
                       <TableCell>Skills Instructions</TableCell>
-                      <TableCell align="right">{streaming.contextBreakdown.skills_tokens.toLocaleString()}</TableCell>
+                      <TableCell align="right">{breakdownData.skills_tokens.toLocaleString()}</TableCell>
                     </TableRow>
                   )}
-                  {streaming.contextBreakdown.tools_guidance_tokens > 0 && (
+                  {breakdownData.tools_guidance_tokens > 0 && (
                     <TableRow>
                       <TableCell>Tools Guidance</TableCell>
-                      <TableCell align="right">{streaming.contextBreakdown.tools_guidance_tokens.toLocaleString()}</TableCell>
+                      <TableCell align="right">{breakdownData.tools_guidance_tokens.toLocaleString()}</TableCell>
                     </TableRow>
                   )}
-                  {streaming.contextBreakdown.other_agents_tokens > 0 && (
+                  {breakdownData.other_agents_tokens > 0 && (
                     <TableRow>
                       <TableCell>Other Agents Info</TableCell>
-                      <TableCell align="right">{streaming.contextBreakdown.other_agents_tokens.toLocaleString()}</TableCell>
+                      <TableCell align="right">{breakdownData.other_agents_tokens.toLocaleString()}</TableCell>
                     </TableRow>
                   )}
                   <TableRow>
-                    <TableCell>Message History ({streaming.contextBreakdown.message_count} msgs)</TableCell>
-                    <TableCell align="right">{streaming.contextBreakdown.message_history_tokens.toLocaleString()}</TableCell>
+                    <TableCell>Message History ({breakdownData.message_count} msgs)</TableCell>
+                    <TableCell align="right">{breakdownData.message_history_tokens.toLocaleString()}</TableCell>
                   </TableRow>
                   <TableRow>
-                    <TableCell>Tool Schemas ({streaming.contextBreakdown.tool_count} tools)</TableCell>
-                    <TableCell align="right">{streaming.contextBreakdown.tool_schemas_tokens.toLocaleString()}</TableCell>
+                    <TableCell>Tool Schemas ({breakdownData.tool_count} tools)</TableCell>
+                    <TableCell align="right">{breakdownData.tool_schemas_tokens.toLocaleString()}</TableCell>
                   </TableRow>
                   <TableRow sx={{ '& td': { fontWeight: 600 } }}>
                     <TableCell>Total</TableCell>
-                    <TableCell align="right">{streaming.contextBreakdown.total_tokens.toLocaleString()}</TableCell>
+                    <TableCell align="right">{breakdownData.total_tokens.toLocaleString()}</TableCell>
                   </TableRow>
                 </TableBody>
               </Table>
 
               {/* Loaded skills */}
-              {streaming.contextBreakdown.loaded_skills.length > 0 && (
+              {breakdownData.loaded_skills.length > 0 && (
                 <Box sx={{ mb: 2 }}>
                   <Typography variant="subtitle2" gutterBottom>Loaded Skills</Typography>
                   <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                    {streaming.contextBreakdown.loaded_skills.map((skill) => (
+                    {breakdownData.loaded_skills.map((skill) => (
                       <Chip key={skill} label={skill} size="small" variant="outlined" />
                     ))}
                   </Box>
@@ -700,13 +739,13 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ characterWindowOpen = fa
               )}
 
               {/* Loaded tools */}
-              {streaming.contextBreakdown.loaded_tools.length > 0 && (
+              {breakdownData.loaded_tools.length > 0 && (
                 <Box>
                   <Typography variant="subtitle2" gutterBottom>
-                    Loaded Tools ({streaming.contextBreakdown.loaded_tools.length})
+                    Loaded Tools ({breakdownData.loaded_tools.length})
                   </Typography>
                   <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, maxHeight: 120, overflowY: 'auto' }}>
-                    {streaming.contextBreakdown.loaded_tools.map((tool) => (
+                    {breakdownData.loaded_tools.map((tool) => (
                       <Chip key={tool} label={tool} size="small" variant="outlined" />
                     ))}
                   </Box>
@@ -714,11 +753,13 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ characterWindowOpen = fa
               )}
 
               <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 2 }}>
-                Turn {streaming.contextBreakdown.turn + 1} | Token estimates based on word count × 1.3
+                Token estimates based on word count × 1.3
               </Typography>
             </Box>
           ) : (
-            <Typography color="text.secondary">No context breakdown available yet. Send a message to see the breakdown.</Typography>
+            <Typography color="text.secondary">
+              {currentConversation ? 'Failed to load context breakdown.' : 'Select a conversation to see context breakdown.'}
+            </Typography>
           )}
         </DialogContent>
       </Dialog>
