@@ -105,7 +105,7 @@ export interface ToolApprovalRequestEvent extends BaseEvent {
   agent_id: number | null;
   name: string | null;
   description: string;
-  risk_level: string;
+  execution_location: 'backend' | 'frontend';
 }
 
 export interface VisionResultEvent extends BaseEvent {

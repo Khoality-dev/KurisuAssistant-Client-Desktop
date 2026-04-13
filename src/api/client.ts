@@ -202,6 +202,32 @@ class APIClient {
     });
   }
 
+  async getContextBreakdown(conversationId: number, agentId?: number): Promise<{
+    conversation_id: number;
+    agent_id: number;
+    agent_name: string;
+    system_prompt_tokens: number;
+    memory_tokens: number;
+    compacted_context_tokens: number;
+    skills_tokens: number;
+    tools_guidance_tokens: number;
+    other_agents_tokens: number;
+    message_history_tokens: number;
+    message_count: number;
+    tool_schemas_tokens: number;
+    tool_count: number;
+    total_tokens: number;
+    context_limit: number;
+    loaded_tools: string[];
+    loaded_skills: string[];
+  }> {
+    const response = await this.client.get(`/conversations/${conversationId}/context-breakdown`, {
+      params: agentId ? { agent_id: agentId } : undefined,
+      headers: this.getHeaders(),
+    });
+    return response.data;
+  }
+
   async updateConversation(id: number, title: string): Promise<void> {
     await this.client.post(
       `/conversations/${id}`,
@@ -280,6 +306,30 @@ class APIClient {
       headers: this.getHeaders(),
     });
     return response.data;
+  }
+
+  // Tool Policies Methods
+
+  async getToolPolicies(): Promise<{ tools: Record<string, 'allow' | 'deny'> }> {
+    const response = await this.client.get('/users/me/tool-policies', {
+      headers: this.getHeaders(),
+    });
+    return response.data;
+  }
+
+  async updateToolPolicies(policies: { tools: Record<string, 'allow' | 'deny'> }): Promise<void> {
+    await this.client.put('/users/me/tool-policies', policies, {
+      headers: this.getHeaders(),
+    });
+  }
+
+  async patchToolPolicy(toolName: string, policy: 'allow' | 'deny' | null): Promise<void> {
+    await this.client.patch('/users/me/tool-policies', {
+      tool_name: toolName,
+      policy: policy,
+    }, {
+      headers: this.getHeaders(),
+    });
   }
 
   async uploadImage(file: File): Promise<{ image_uuid: string; url: string }> {
