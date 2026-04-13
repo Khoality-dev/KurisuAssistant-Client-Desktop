@@ -24,6 +24,7 @@ export type EventType =
   | 'media_chunk'
   | 'media_error'
   | 'context_info'
+  | 'context_breakdown'
   | 'connected';
 
 // Base event interface
@@ -171,6 +172,27 @@ export interface ContextInfoEvent extends BaseEvent {
   compacted_context: string;
 }
 
+export interface ContextBreakdownEvent extends BaseEvent {
+  type: 'context_breakdown';
+  conversation_id: number;
+  frame_id: number;
+  turn: number;
+  system_prompt_tokens: number;
+  memory_tokens: number;
+  compacted_context_tokens: number;
+  skills_tokens: number;
+  tools_guidance_tokens: number;
+  other_agents_tokens: number;
+  message_history_tokens: number;
+  message_count: number;
+  tool_schemas_tokens: number;
+  tool_count: number;
+  total_tokens: number;
+  context_limit: number;
+  loaded_tools: string[];
+  loaded_skills: string[];
+}
+
 export interface ConnectedEvent extends BaseEvent {
   type: 'connected';
   chat_active: boolean;
@@ -202,7 +224,8 @@ export type ServerEvent =
   | MediaStateEvent
   | MediaChunkEvent
   | MediaErrorEvent
-  | ContextInfoEvent;
+  | ContextInfoEvent
+  | ContextBreakdownEvent;
 
 type EventHandler<T = ServerEvent> = (event: T) => void;
 

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { wsManager, StreamChunkEvent, DoneEvent, ErrorEvent, ConnectedEvent, ToolApprovalRequestEvent, ContextInfoEvent } from '../api/websocket';
+import { wsManager, StreamChunkEvent, DoneEvent, ErrorEvent, ConnectedEvent, ToolApprovalRequestEvent, ContextInfoEvent, ContextBreakdownEvent } from '../api/websocket';
 import { useConversationStore } from '../store/conversationStore';
 import { storage } from '../utils/storage';
 import { stripNarration, fileToBase64 } from '../utils/chat';
@@ -25,6 +25,24 @@ export interface UseStreamingChatParams {
   // Character panel
   amplitudeRef: React.MutableRefObject<AmplitudeState>;
   pushAgentCharacterConfig: (agentId: number | undefined, agentName?: string) => void;
+}
+
+export interface ContextBreakdown {
+  turn: number;
+  system_prompt_tokens: number;
+  memory_tokens: number;
+  compacted_context_tokens: number;
+  skills_tokens: number;
+  tools_guidance_tokens: number;
+  other_agents_tokens: number;
+  message_history_tokens: number;
+  message_count: number;
+  tool_schemas_tokens: number;
+  tool_count: number;
+  total_tokens: number;
+  context_limit: number;
+  loaded_tools: string[];
+  loaded_skills: string[];
 }
 
 export interface UseStreamingChatReturn {
@@ -57,6 +75,7 @@ export interface UseStreamingChatReturn {
   contextTokens: number;
   contextLimit: number;
   isCompacting: boolean;
+  contextBreakdown: ContextBreakdown | null;
 }
 
 export function useStreamingChat({
@@ -90,6 +109,7 @@ export function useStreamingChat({
   const [contextTokens, setContextTokens] = useState(0);
   const [isCompacting, setIsCompacting] = useState(false);
   const [queuedMessages, setQueuedMessages] = useState<Message[]>([]);
+  const [contextBreakdown, setContextBreakdown] = useState<ContextBreakdown | null>(null);
 
   // Ref to track streaming state without stale closures
   const isStreamingRef = useRef(false);
@@ -536,6 +556,25 @@ export function useStreamingChat({
         }
       }
     };
+    const onContextBreakdown = (e: ContextBreakdownEvent) => {
+      setContextBreakdown({
+        turn: e.turn,
+        system_prompt_tokens: e.system_prompt_tokens,
+        memory_tokens: e.memory_tokens,
+        compacted_context_tokens: e.compacted_context_tokens,
+        skills_tokens: e.skills_tokens,
+        tools_guidance_tokens: e.tools_guidance_tokens,
+        other_agents_tokens: e.other_agents_tokens,
+        message_history_tokens: e.message_history_tokens,
+        message_count: e.message_count,
+        tool_schemas_tokens: e.tool_schemas_tokens,
+        tool_count: e.tool_count,
+        total_tokens: e.total_tokens,
+        context_limit: e.context_limit,
+        loaded_tools: e.loaded_tools,
+        loaded_skills: e.loaded_skills,
+      });
+    };
 
     wsManager.on('stream_chunk', onChunk);
     wsManager.on('done', onDone);
@@ -543,6 +582,7 @@ export function useStreamingChat({
     wsManager.on('connected', onConnected);
     wsManager.on('tool_approval_request', onApproval);
     wsManager.on('context_info', onContextInfo);
+    wsManager.on('context_breakdown', onContextBreakdown);
 
     return () => {
       wsManager.off('stream_chunk', onChunk);
@@ -551,6 +591,7 @@ export function useStreamingChat({
       wsManager.off('connected', onConnected);
       wsManager.off('tool_approval_request', onApproval);
       wsManager.off('context_info', onContextInfo);
+      wsManager.off('context_breakdown', onContextBreakdown);
     };
   }, []);
 
@@ -881,5 +922,6 @@ export function useStreamingChat({
     contextTokens,
     contextLimit: 0,  // Frontend determines limit from model config
     isCompacting,
+    contextBreakdown,
   };
 }

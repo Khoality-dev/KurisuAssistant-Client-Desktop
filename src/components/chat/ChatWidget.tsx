@@ -11,6 +11,16 @@ import {
   IconButton,
   TextField,
   InputAdornment,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  Table,
+  TableBody,
+  TableRow,
+  TableCell,
+  Chip,
+  Tooltip,
+  LinearProgress,
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
@@ -18,6 +28,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import CloseIcon from '@mui/icons-material/Close';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 
 import { AnimatePresence } from 'framer-motion';
 import { useConversationStore } from '../../store/conversationStore';
@@ -61,6 +72,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ characterWindowOpen = fa
   // Display mode: "all" shows full history, "context" shows only LLM context window
   const [displayMode, setDisplayMode] = useState<'all' | 'context'>('all');
   const [contextBannerExpanded, setContextBannerExpanded] = useState(false);
+  const [breakdownDialogOpen, setBreakdownDialogOpen] = useState(false);
 
   // Message search
   const [searchOpen, setSearchOpen] = useState(false);
@@ -433,17 +445,30 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ characterWindowOpen = fa
             <ToggleButton value="all">All</ToggleButton>
             <ToggleButton value="context">Context</ToggleButton>
           </ToggleButtonGroup>
-          <Typography
-            variant="caption"
-            sx={{
-              color: tokenCount > contextSize * 0.9 ? 'error.main'
-                : tokenCount > contextSize * 0.8 ? 'warning.main'
-                : 'text.secondary',
-              fontWeight: tokenCount > contextSize * 0.8 ? 600 : 400,
-            }}
-          >
-            {tokenCount.toLocaleString()} / {contextSize.toLocaleString()} tokens
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <Typography
+              variant="caption"
+              sx={{
+                color: tokenCount > contextSize * 0.9 ? 'error.main'
+                  : tokenCount > contextSize * 0.8 ? 'warning.main'
+                  : 'text.secondary',
+                fontWeight: tokenCount > contextSize * 0.8 ? 600 : 400,
+              }}
+            >
+              {tokenCount.toLocaleString()} / {contextSize.toLocaleString()} tokens
+            </Typography>
+            {streaming.contextBreakdown && (
+              <Tooltip title="View context breakdown">
+                <IconButton
+                  size="small"
+                  onClick={() => setBreakdownDialogOpen(true)}
+                  sx={{ p: 0.25 }}
+                >
+                  <InfoOutlinedIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+                </IconButton>
+              </Tooltip>
+            )}
+          </Box>
         </Box>
       )}
 
@@ -564,6 +589,139 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ characterWindowOpen = fa
           {streaming.infoToast}
         </Alert>
       </Snackbar>
+
+      {/* Context Breakdown Dialog */}
+      <Dialog
+        open={breakdownDialogOpen}
+        onClose={() => setBreakdownDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          Context Breakdown
+          <IconButton size="small" onClick={() => setBreakdownDialogOpen(false)}>
+            <CloseIcon fontSize="small" />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent>
+          {streaming.contextBreakdown ? (
+            <Box>
+              {/* Progress bar */}
+              <Box sx={{ mb: 2 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                  <Typography variant="body2">
+                    {streaming.contextBreakdown.total_tokens.toLocaleString()} / {streaming.contextBreakdown.context_limit.toLocaleString()} tokens
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {Math.round((streaming.contextBreakdown.total_tokens / streaming.contextBreakdown.context_limit) * 100)}%
+                  </Typography>
+                </Box>
+                <LinearProgress
+                  variant="determinate"
+                  value={Math.min(100, (streaming.contextBreakdown.total_tokens / streaming.contextBreakdown.context_limit) * 100)}
+                  sx={{
+                    height: 8,
+                    borderRadius: 1,
+                    backgroundColor: 'action.hover',
+                    '& .MuiLinearProgress-bar': {
+                      backgroundColor: streaming.contextBreakdown.total_tokens > streaming.contextBreakdown.context_limit * 0.9
+                        ? 'error.main'
+                        : streaming.contextBreakdown.total_tokens > streaming.contextBreakdown.context_limit * 0.8
+                        ? 'warning.main'
+                        : 'primary.main',
+                    },
+                  }}
+                />
+              </Box>
+
+              {/* Token breakdown table */}
+              <Typography variant="subtitle2" gutterBottom>Token Usage by Component</Typography>
+              <Table size="small" sx={{ mb: 2 }}>
+                <TableBody>
+                  <TableRow>
+                    <TableCell>System Prompt</TableCell>
+                    <TableCell align="right">{streaming.contextBreakdown.system_prompt_tokens.toLocaleString()}</TableCell>
+                  </TableRow>
+                  {streaming.contextBreakdown.memory_tokens > 0 && (
+                    <TableRow>
+                      <TableCell>Agent Memory</TableCell>
+                      <TableCell align="right">{streaming.contextBreakdown.memory_tokens.toLocaleString()}</TableCell>
+                    </TableRow>
+                  )}
+                  {streaming.contextBreakdown.compacted_context_tokens > 0 && (
+                    <TableRow>
+                      <TableCell>Compacted Context</TableCell>
+                      <TableCell align="right">{streaming.contextBreakdown.compacted_context_tokens.toLocaleString()}</TableCell>
+                    </TableRow>
+                  )}
+                  {streaming.contextBreakdown.skills_tokens > 0 && (
+                    <TableRow>
+                      <TableCell>Skills Instructions</TableCell>
+                      <TableCell align="right">{streaming.contextBreakdown.skills_tokens.toLocaleString()}</TableCell>
+                    </TableRow>
+                  )}
+                  {streaming.contextBreakdown.tools_guidance_tokens > 0 && (
+                    <TableRow>
+                      <TableCell>Tools Guidance</TableCell>
+                      <TableCell align="right">{streaming.contextBreakdown.tools_guidance_tokens.toLocaleString()}</TableCell>
+                    </TableRow>
+                  )}
+                  {streaming.contextBreakdown.other_agents_tokens > 0 && (
+                    <TableRow>
+                      <TableCell>Other Agents Info</TableCell>
+                      <TableCell align="right">{streaming.contextBreakdown.other_agents_tokens.toLocaleString()}</TableCell>
+                    </TableRow>
+                  )}
+                  <TableRow>
+                    <TableCell>Message History ({streaming.contextBreakdown.message_count} msgs)</TableCell>
+                    <TableCell align="right">{streaming.contextBreakdown.message_history_tokens.toLocaleString()}</TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell>Tool Schemas ({streaming.contextBreakdown.tool_count} tools)</TableCell>
+                    <TableCell align="right">{streaming.contextBreakdown.tool_schemas_tokens.toLocaleString()}</TableCell>
+                  </TableRow>
+                  <TableRow sx={{ '& td': { fontWeight: 600 } }}>
+                    <TableCell>Total</TableCell>
+                    <TableCell align="right">{streaming.contextBreakdown.total_tokens.toLocaleString()}</TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+
+              {/* Loaded skills */}
+              {streaming.contextBreakdown.loaded_skills.length > 0 && (
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="subtitle2" gutterBottom>Loaded Skills</Typography>
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                    {streaming.contextBreakdown.loaded_skills.map((skill) => (
+                      <Chip key={skill} label={skill} size="small" variant="outlined" />
+                    ))}
+                  </Box>
+                </Box>
+              )}
+
+              {/* Loaded tools */}
+              {streaming.contextBreakdown.loaded_tools.length > 0 && (
+                <Box>
+                  <Typography variant="subtitle2" gutterBottom>
+                    Loaded Tools ({streaming.contextBreakdown.loaded_tools.length})
+                  </Typography>
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, maxHeight: 120, overflowY: 'auto' }}>
+                    {streaming.contextBreakdown.loaded_tools.map((tool) => (
+                      <Chip key={tool} label={tool} size="small" variant="outlined" />
+                    ))}
+                  </Box>
+                </Box>
+              )}
+
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 2 }}>
+                Turn {streaming.contextBreakdown.turn + 1} | Token estimates based on word count × 1.3
+              </Typography>
+            </Box>
+          ) : (
+            <Typography color="text.secondary">No context breakdown available yet. Send a message to see the breakdown.</Typography>
+          )}
+        </DialogContent>
+      </Dialog>
     </Box>
   );
 };
