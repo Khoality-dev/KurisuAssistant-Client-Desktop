@@ -279,7 +279,7 @@ export function useStreamingChat({
 
     // Check if we need to create a new bubble:
     // - Role changed (user -> assistant -> tool)
-    // - Agent changed (Administrator -> Agent1 -> Administrator) - compare by name since admin may not have ID
+    // - Agent changed (handoff between main agents) - compare by name
     const roleChanged = state.currentRole && messageRole !== state.currentRole;
     const agentChanged = state.hasStarted && state.currentAgentName !== agentName;
     const needsNewBubble = roleChanged || agentChanged;
@@ -733,7 +733,7 @@ export function useStreamingChat({
         text,
         '', // Model determined by backend
         activeConversationId,
-        agentId, // Single agent mode or null for Administrator routing
+        agentId, // Specific agent, or null to let the routing LLM pick
         imageBase64,
         contextFiles,
       );

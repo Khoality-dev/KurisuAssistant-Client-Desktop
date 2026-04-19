@@ -56,7 +56,7 @@ interface AgentEditDialogProps {
   onClose: () => void;
   formData: AgentFormData;
   setFormData: (data: AgentFormData) => void;
-  isAdministrator: boolean;
+  isSystemAgent: boolean;
   isPromptEditorExpanded: boolean;
   setIsPromptEditorExpanded: (value: boolean | ((current: boolean) => boolean)) => void;
   models: Array<{ name: string; provider: string }>;
@@ -72,7 +72,7 @@ export const AgentEditDialog: React.FC<AgentEditDialogProps> = ({
   onClose,
   formData,
   setFormData,
-  isAdministrator,
+  isSystemAgent,
   isPromptEditorExpanded,
   setIsPromptEditorExpanded,
   models,
@@ -109,7 +109,7 @@ export const AgentEditDialog: React.FC<AgentEditDialogProps> = ({
             </Typography>
           </Box>
           <Typography variant="caption" color="text.secondary" sx={{ pt: 0.5 }}>
-            {isAdministrator ? 'System agent' : 'Custom agent'}
+            {isSystemAgent ? 'System agent' : 'Custom agent'}
           </Typography>
         </Box>
       </DialogTitle>
@@ -127,8 +127,8 @@ export const AgentEditDialog: React.FC<AgentEditDialogProps> = ({
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 fullWidth
                 required
-                disabled={isAdministrator}
-                helperText={isAdministrator ? 'Administrator name cannot be changed' : 'Display name used across the app'}
+                disabled={isSystemAgent}
+                helperText={isSystemAgent ? 'System agent name cannot be changed' : 'Display name used across the app'}
               />
               <TextField
                 label="Description"
@@ -186,14 +186,14 @@ export const AgentEditDialog: React.FC<AgentEditDialogProps> = ({
                   </Box>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <Typography variant="caption" color="text.secondary">
-                      {(isAdministrator ? 'System agent for routing conversations' : formData.system_prompt).length} chars
+                      {(isSystemAgent ? 'System-managed prompt' : formData.system_prompt).length} chars
                     </Typography>
                     <Button
                       size="small"
                       variant="text"
                       startIcon={isPromptEditorExpanded ? <CloseFullscreenIcon /> : <OpenInFullIcon />}
                       onClick={() => setIsPromptEditorExpanded((current: boolean) => !current)}
-                      disabled={isAdministrator}
+                      disabled={isSystemAgent}
                     >
                       {isPromptEditorExpanded ? 'Compact' : 'Expand'}
                     </Button>
@@ -201,14 +201,14 @@ export const AgentEditDialog: React.FC<AgentEditDialogProps> = ({
                 </Box>
                 <TextField
                   label={isPromptEditorExpanded ? 'Prompt Workspace' : 'System Prompt'}
-                  value={isAdministrator ? 'System agent for routing conversations' : formData.system_prompt}
+                  value={isSystemAgent ? 'System-managed prompt' : formData.system_prompt}
                   onChange={(e) => setFormData({ ...formData, system_prompt: e.target.value })}
                   multiline
                   minRows={isPromptEditorExpanded ? 12 : 6}
                   maxRows={isPromptEditorExpanded ? 20 : 10}
                   fullWidth
-                  disabled={isAdministrator}
-                  helperText={isAdministrator ? 'Administrator uses built-in routing logic' : 'Write instructions in plain language. Include role, response style, constraints, and when to use tools.'}
+                  disabled={isSystemAgent}
+                  helperText={isSystemAgent ? 'System agents use built-in prompts' : 'Write instructions in plain language. Include role, response style, constraints, and when to use tools.'}
                   InputProps={{
                     sx: {
                       alignItems: 'flex-start',

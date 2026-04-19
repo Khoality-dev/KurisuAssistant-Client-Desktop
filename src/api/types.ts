@@ -122,31 +122,6 @@ export interface TTSRequest {
   use_emo_text?: boolean;
 }
 
-export interface Persona {
-  id: number;
-  name: string;
-  system_prompt: string;
-  voice_reference: string | null;
-  avatar_uuid: string | null;
-  character_config: CharacterConfigDTO | null;
-  preferred_name: string | null;
-  trigger_word: string | null;
-}
-
-export interface PersonaCreate {
-  name: string;
-  system_prompt?: string;
-  preferred_name?: string;
-  trigger_word?: string;
-}
-
-export interface PersonaUpdate {
-  name?: string;
-  system_prompt?: string;
-  preferred_name?: string;
-  trigger_word?: string;
-}
-
 export interface Agent {
   id: number;
   name: string;
@@ -309,14 +284,6 @@ export interface SkillCreate {
 export interface SkillUpdate {
   name?: string;
   instructions?: string;
-}
-
-// Avatar candidate types
-
-export interface AvatarCandidate {
-  uuid: string;
-  pose_id: string;
-  score: number;
 }
 
 // Face recognition types

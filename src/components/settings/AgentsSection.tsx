@@ -45,7 +45,7 @@ import { AgentEditDialog } from './AgentEditDialog';
 const MotionCard = motion(Card);
 
 // Internal tools that shouldn't appear in the exclusion list
-const INTERNAL_TOOLS = ['route_to_agent', 'route_to_user', 'play_music', 'music_control', 'get_music_queue'];
+const INTERNAL_TOOLS = ['play_music', 'music_control', 'get_music_queue'];
 
 interface AgentFormData {
   name: string;
@@ -326,7 +326,7 @@ export const AgentsSection: React.FC = () => {
     setDeleteDialogOpen(true);
   };
 
-  const isAdministrator = selectedAgent?.name === 'Administrator';
+  const isSystemAgent = selectedAgent?.is_system ?? false;
 
   return (
     <Box>
@@ -650,7 +650,7 @@ export const AgentsSection: React.FC = () => {
         onClose={() => setEditDialogOpen(false)}
         formData={formData}
         setFormData={setFormData}
-        isAdministrator={isAdministrator}
+        isSystemAgent={isSystemAgent}
         isPromptEditorExpanded={isPromptEditorExpanded}
         setIsPromptEditorExpanded={setIsPromptEditorExpanded}
         models={models}

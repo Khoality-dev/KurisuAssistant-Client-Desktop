@@ -66,9 +66,9 @@ export function useCharacterPanel({
     });
   }, []);
 
-  // Set active agent during streaming (for lip sync); skip Administrator
+  // Set active agent during streaming (for lip sync)
   const pushAgentCharacterConfig = useCallback((agentId: number | undefined, agentName?: string) => {
-    if (!agentId || agentName === 'Administrator') return;
+    if (!agentId) return;
     setActiveAgentId(agentId);
     fetchAgentForPanel(agentId, agentName, true);
   }, [fetchAgentForPanel]);
@@ -80,12 +80,12 @@ export function useCharacterPanel({
     setActiveAgentId(null);
   }, [currentConversationId]);
 
-  // Scan messages for agents to populate the character panel (skip Administrator)
+  // Scan messages for agents to populate the character panel
   useEffect(() => {
     if (!characterWindowOpen) return;
     for (const msg of messages) {
       const name = msg.agent?.name || msg.name;
-      if (msg.agent_id && name !== 'Administrator' && !agentCacheRef.current.has(msg.agent_id)) {
+      if (msg.agent_id && !agentCacheRef.current.has(msg.agent_id)) {
         fetchAgentForPanel(msg.agent_id, name);
       }
     }
