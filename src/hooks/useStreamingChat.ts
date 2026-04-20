@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { flushSync } from 'react-dom';
 import { wsManager, StreamChunkEvent, DoneEvent, ErrorEvent, ConnectedEvent, ToolApprovalRequestEvent, ContextInfoEvent, ContextBreakdownEvent } from '../api/websocket';
 import { useConversationStore } from '../store/conversationStore';
 import { useToolPermissionsStore } from '../store/toolPermissionsStore';
@@ -138,6 +139,12 @@ export function useStreamingChat({
   const pendingStreamRef = useRef<{ content: string; thinking: string }>({ content: '', thinking: '' });
   const prevConversationIdRef = useRef<number | null>(null);
 
+  // Mirror of streamingMessages for synchronous reads from event handlers. Kept
+  // outside setState updaters so side effects like appendMessages aren't doubled
+  // by React.StrictMode's updater re-invocation in dev.
+  const streamingMessagesRef = useRef<Message[]>([]);
+  streamingMessagesRef.current = streamingMessages;
+
   useEffect(() => {
     isStreamingRef.current = isStreaming;
   }, [isStreaming]);
@@ -171,14 +178,31 @@ export function useStreamingChat({
     }
   }, []);
 
-  // Conversation change cleanup
+  // Conversation change cleanup.
+  //
+  // This effect fires whenever `currentConversation` gets a new object reference —
+  // including the null→N transition that happens when a chunk assigns the
+  // first-ever conversation_id during an active stream, and the background
+  // reload after `done` that replaces the conversation object with the same id.
+  // Wiping streaming state on those transitions would erase the user bubble and
+  // reset the accumulator mid-stream, so we only clear on an *actual* switch
+  // to a different conversation.
   useEffect(() => {
     const newId = currentConversation?.id || null;
-    const isActualSwitch = prevConversationIdRef.current !== null && prevConversationIdRef.current !== newId;
+    const prevId = prevConversationIdRef.current;
+    const isActualSwitch = prevId !== null && newId !== null && prevId !== newId;
     prevConversationIdRef.current = newId;
 
     setActiveConversationId(newId);
-    // Clear local streaming state when conversation changes
+
+    if (!isActualSwitch) {
+      // Keep streaming/TTS state intact: this is either initial mount, a
+      // null→N transition on first chunk of a new conversation, or a same-id
+      // reload after done.
+      return;
+    }
+
+    // Clear local streaming state on a real switch.
     setStreamingMessages([]);
     setStreamingContent('');
     setStreamingThinking('');
@@ -186,10 +210,7 @@ export function useStreamingChat({
     setIsStreaming(false);
     isStreamingRef.current = false;
     cancelStreamUpdate();
-    // Only clear TTS queue on actual conversation switch, not on reload of the same conversation
-    if (isActualSwitch) {
-      clearQueue();
-    }
+    clearQueue();
     ttsBufferRef.current = '';
     ttsVoiceRef.current = undefined;
     streamingStateRef.current = {
@@ -460,16 +481,20 @@ export function useStreamingChat({
     ttsVoiceRef.current = undefined;    // Do not clear activeAgentId here; TTS may still be playing after streaming ends.
     // activeAgentId is cleared when isQueueActive becomes false (see effect below).
 
-    // Finalize last streaming message with accumulated content
-    setStreamingMessages(prev => {
-      if (prev.length === 0) return prev;
-      const updated = [...prev];
-      updated[updated.length - 1] = {
-        ...updated[updated.length - 1],
-        content: state.accumulatedContent,
-        thinking: state.accumulatedThinking || undefined,
-      };
-      return updated;
+    // Finalize the last streaming message. flushSync commits synchronously so
+    // the post-render ref mirror is up-to-date before we read it. Without this,
+    // the ref can be one render behind if chunks arrived in rapid succession.
+    flushSync(() => {
+      setStreamingMessages(prev => {
+        if (prev.length === 0) return prev;
+        const updated = [...prev];
+        updated[updated.length - 1] = {
+          ...updated[updated.length - 1],
+          content: state.accumulatedContent,
+          thinking: state.accumulatedThinking || undefined,
+        };
+        return updated;
+      });
     });
 
     cancelStreamUpdate();
@@ -478,13 +503,15 @@ export function useStreamingChat({
     setJustFinishedStreaming(true);
     setIsStreaming(false);
 
-    // Move streaming messages into store, then clear streaming state
-    setStreamingMessages(prev => {
-      if (prev.length > 0) {
-        useConversationStore.getState().appendMessages(prev);
-      }
-      return [];
-    });
+    // Move streaming messages into store, then clear streaming state. Read from
+    // the ref (kept in sync via render assignment) so the side effect runs
+    // exactly once — React.StrictMode re-invokes setState updaters in dev, so
+    // appendMessages must not live inside one.
+    const finalized = streamingMessagesRef.current;
+    if (finalized.length > 0) {
+      useConversationStore.getState().appendMessages(finalized);
+    }
+    setStreamingMessages([]);
     // Clear queued messages (they'll be reloaded from DB after backend processes them)
     setQueuedMessages([]);
 
@@ -801,19 +828,20 @@ export function useStreamingChat({
     // Clear subtitle
     window.electron?.characterWindow?.sendSubtitle({ text: '', isUser: false });
 
-    // Finalize streaming messages and merge into store
+    // Finalize streaming messages and merge into store. Read from the ref so
+    // the side effect runs exactly once (StrictMode re-invokes state updaters).
     const state = streamingStateRef.current;
-    setStreamingMessages(prev => {
-      if (prev.length === 0) return prev;
-      const updated = [...prev];
+    const current = streamingMessagesRef.current;
+    if (current.length > 0) {
+      const updated = [...current];
       updated[updated.length - 1] = {
         ...updated[updated.length - 1],
         content: state.accumulatedContent,
         thinking: state.accumulatedThinking || undefined,
       };
       useConversationStore.getState().appendMessages(updated);
-      return [];
-    });
+    }
+    setStreamingMessages([]);
 
     setIsStreaming(false);
     cancelStreamUpdate();

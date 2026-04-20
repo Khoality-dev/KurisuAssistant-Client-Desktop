@@ -10,7 +10,9 @@
     "electron:dev": "vite",
     "electron:build": "vite build && electron-builder",
     "test:e2e:build": "vite build",
+    "test:e2e:build:dev": "vite build --mode development",
     "test:e2e": "playwright test",
+    "test:e2e:dev": "vite build --mode development && playwright test",
     "test:e2e:headed": "playwright test --headed"
   },
   "keywords": [

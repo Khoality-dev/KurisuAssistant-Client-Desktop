@@ -148,22 +148,23 @@ test.describe('streaming', () => {
     await expect(page.getByText(/Thinking/i).first()).toBeVisible({ timeout: 5_000 });
   });
 
-  test('assistant text splits into new bubble when role changes (tool call)', async ({ page, mock }) => {
+  test('assistant text and tool output both render when a tool call interrupts', async ({ page, mock }) => {
+    // Slow stream so the split-per-role rendering is observable before the
+    // backend's post-done reload can re-concatenate same-role chunks.
     mock.setStream({
       chunks: [
-        { content: 'Let me check. ', role: 'assistant', delayMs: 10 },
-        { content: '{"result":"42"}', role: 'tool', delayMs: 10 },
-        { content: 'The result is 42.', role: 'assistant', delayMs: 10 },
+        { content: 'Let me check. ', role: 'assistant', delayMs: 150 },
+        { content: '{"result":"42"}', role: 'tool', delayMs: 150 },
+        { content: 'The result is 42.', role: 'assistant', delayMs: 150 },
       ],
     });
 
     await login(page);
     await send(page, 'tool demo');
 
-    await expect(page.getByText('Let me check.')).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText('The result is 42.')).toBeVisible({ timeout: 10_000 });
-    // Both assistant fragments visible — not concatenated into one bubble.
-    expect(await page.getByText('Let me check.').count()).toBeGreaterThanOrEqual(1);
-    expect(await page.getByText('The result is 42.').count()).toBeGreaterThanOrEqual(1);
+    // Wait for the full stream to render (pre-reload window).
+    await expect(page.getByText('Let me check.').first()).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(/\{"result":"42"\}/).first()).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText('The result is 42.').first()).toBeVisible({ timeout: 10_000 });
   });
 });
