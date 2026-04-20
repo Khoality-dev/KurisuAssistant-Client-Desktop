@@ -7,7 +7,6 @@ import {
 } from '@mui/icons-material';
 import { useConversationStore } from '../../store/conversationStore';
 import { ChatWidget } from '../chat/ChatWidget';
-import { MediaPlayerBar } from '../MediaPlayerBar';
 
 export const ChatPanel: React.FC = () => {
   const { currentConversation, deleteConversation } = useConversationStore();
@@ -82,9 +81,6 @@ export const ChatPanel: React.FC = () => {
       <Box sx={{ flex: 1, overflow: 'hidden', display: 'flex', minWidth: 0 }}>
         <ChatWidget characterWindowOpen={characterVisible} />
       </Box>
-
-      {/* Media player */}
-      <MediaPlayerBar />
     </Box>
   );
 };

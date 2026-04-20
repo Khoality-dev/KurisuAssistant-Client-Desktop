@@ -20,9 +20,6 @@ export type EventType =
   | 'done'
   | 'error'
   | 'vision_result'
-  | 'media_state'
-  | 'media_chunk'
-  | 'media_error'
   | 'context_info'
   | 'context_breakdown'
   | 'connected';
@@ -122,40 +119,6 @@ export interface VisionResultEvent extends BaseEvent {
   }>;
 }
 
-export interface MediaStateEvent extends BaseEvent {
-  type: 'media_state';
-  state: 'stopped' | 'playing' | 'paused';
-  current_track: {
-    title: string;
-    url: string;
-    duration: number | null;
-    thumbnail: string | null;
-    artist: string | null;
-  } | null;
-  queue: Array<{
-    title: string;
-    url: string;
-    duration: number | null;
-    thumbnail: string | null;
-    artist: string | null;
-  }>;
-  volume: number;
-}
-
-export interface MediaChunkEvent extends BaseEvent {
-  type: 'media_chunk';
-  data: string; // base64 encoded audio
-  chunk_index: number;
-  is_last: boolean;
-  format: string;
-  sample_rate: number;
-}
-
-export interface MediaErrorEvent extends BaseEvent {
-  type: 'media_error';
-  error: string;
-}
-
 // Server -> Client: tool call forwarding
 export interface ToolCallRequestEvent extends BaseEvent {
   type: 'tool_call_request';
@@ -198,12 +161,6 @@ export interface ConnectedEvent extends BaseEvent {
   chat_active: boolean;
   conversation_id: number | null;
   frame_id: number | null;
-  media_state: {
-    state: 'stopped' | 'playing' | 'paused';
-    current_track: MediaStateEvent['current_track'];
-    queue: MediaStateEvent['queue'];
-    volume: number;
-  } | null;
   vision_active: boolean;
   vision_config: {
     enable_face: boolean;
@@ -221,9 +178,6 @@ export type ServerEvent =
   | ToolApprovalRequestEvent
   | ToolCallRequestEvent
   | VisionResultEvent
-  | MediaStateEvent
-  | MediaChunkEvent
-  | MediaErrorEvent
   | ContextInfoEvent
   | ContextBreakdownEvent;
 
@@ -520,38 +474,6 @@ class WebSocketManager {
    */
   sendToolCallResponse(requestId: string, content: string, isError: boolean) {
     this.send({ type: 'tool_call_response', request_id: requestId, content, is_error: isError });
-  }
-
-  // Media control methods
-
-  async sendMediaPlay(query: string) {
-    await this.connect();
-    this.send({ type: 'media_play', query });
-  }
-
-  async sendMediaPause() {
-    await this.connect();
-    this.send({ type: 'media_pause' });
-  }
-
-  async sendMediaResume() {
-    await this.connect();
-    this.send({ type: 'media_resume' });
-  }
-
-  async sendMediaSkip() {
-    await this.connect();
-    this.send({ type: 'media_skip' });
-  }
-
-  async sendMediaStop() {
-    await this.connect();
-    this.send({ type: 'media_stop' });
-  }
-
-  async sendMediaVolume(volume: number) {
-    await this.connect();
-    this.send({ type: 'media_volume', volume });
   }
 
   /**
