@@ -12,6 +12,7 @@ React 18, Electron 28, MUI v5, Framer Motion, Zustand, Axios, Vite, react-markdo
 
 - Dev: `npm run electron:dev` (Vite on localhost:5173 + Electron)
 - Build: `npm run electron:build` (tsc + Vite + electron-builder → `release/`)
+- E2E tests: `npm run test:e2e:build` then `npm run test:e2e` (Playwright Electron; see `tests/`)
 
 ## CI/CD
 
@@ -215,6 +216,17 @@ Two-level state managed by `useMicStore` (Zustand, `src/store/micStore.ts`): `in
 
 ### Pagination
 - 20 messages/page, newest first. Scroll to top triggers `loadMoreMessages()`. Position preserved. Loading indicator hidden in Context display mode.
+
+## Testing
+
+E2E tests live in `tests/` and run via Playwright's Electron support.
+
+- `playwright.config.ts` — serial, single worker (each test spawns its own Electron + mock backend).
+- `tests/fixtures.ts` — `test` fixture that launches Electron pointing at `dist-electron/main.js` with an isolated userData dir (via `KURISU_E2E_USER_DATA_DIR` env var, which `electron/main.ts` honors for tests only), starts a mock backend on a random port, and seeds `kurisu_backend_url` in localStorage before reload.
+- `tests/mock/server.ts` — HTTP + WebSocket mock implementing login/profile/agents/conversations/models/tools/mcp-servers endpoints and the `/ws/chat` streaming protocol. Configurable via `setStream`, `setTools`, `addMcpServer`. `dropAllWebSockets()` simulates a silent backend socket loss. Tracks `lastChatRequest` and `lastMcpServerCreate` for assertions.
+- Specs: `smoke.spec.ts`, `streaming.spec.ts`, `settings.spec.ts`, `mcp.spec.ts`, `resilience.spec.ts`.
+
+Commands: `npm run test:e2e:build` (vite build → `dist/` + `dist-electron/`), then `npm run test:e2e` (or `test:e2e:headed` for debugging).
 
 ## Backend API Endpoints
 
