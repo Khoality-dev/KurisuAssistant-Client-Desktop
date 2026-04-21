@@ -9,10 +9,6 @@ import {
   DialogContent,
   DialogActions,
   Switch,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
 } from '@mui/material';
 import {
   Badge as BadgeIcon,
@@ -45,17 +41,18 @@ interface AgentFormData {
   memory: string;
   memory_enabled: boolean;
   use_deferred_tools: boolean;
-  agent_type: string;
+  agent_type: 'main' | 'sub';
   voice_reference: string | null;
   avatar_uuid: string | null;
   preferred_name: string | null;
+  trigger_word: string | null;
 }
 
 interface AgentEditDialogProps {
   open: boolean;
   onClose: () => void;
   formData: AgentFormData;
-  setFormData: (data: AgentFormData) => void;
+  setFormData: React.Dispatch<React.SetStateAction<AgentFormData>>;
   isSystemAgent: boolean;
   isPromptEditorExpanded: boolean;
   setIsPromptEditorExpanded: (value: boolean | ((current: boolean) => boolean)) => void;
@@ -135,19 +132,21 @@ export const AgentEditDialog: React.FC<AgentEditDialogProps> = ({
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 fullWidth
-                helperText="Brief description of this agent's role (used for routing)"
+                helperText={
+                  formData.agent_type === 'sub'
+                    ? 'Shown to main agents as the sub-agent tool description'
+                    : "Brief description of this agent's role"
+                }
               />
-              <FormControl fullWidth>
-                <InputLabel>Agent Type</InputLabel>
-                <Select
-                  value={formData.agent_type}
-                  label="Agent Type"
-                  onChange={(e) => setFormData({ ...formData, agent_type: e.target.value })}
-                >
-                  <MenuItem value="main">Main Agent (has personality)</MenuItem>
-                  <MenuItem value="sub">Sub-agent (tool only)</MenuItem>
-                </Select>
-              </FormControl>
+              {formData.agent_type === 'main' && (
+                <TextField
+                  label="Trigger Word"
+                  value={formData.trigger_word || ''}
+                  onChange={(e) => setFormData({ ...formData, trigger_word: e.target.value || null })}
+                  fullWidth
+                  helperText="If a new conversation's first message contains this word, this agent is picked. Leave blank for random pick."
+                />
+              )}
             </Box>
           </Box>
 

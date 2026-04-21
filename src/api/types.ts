@@ -19,7 +19,6 @@ export interface Message {
   content: string;
   thinking?: string; // Optional thinking content (for assistant messages)
   images?: string[];
-  frame_id?: number;
   created_at?: string;
   agent_id?: number; // Which agent sent this message
   name?: string; // Speaker identity (agent name, tool name, etc.)
@@ -50,25 +49,19 @@ export interface ConversationLastMessage {
 export interface Conversation {
   id: number;
   title: string;
-  frame_count: number;
+  main_agent_id: number | null;  // null until first message picks a main agent
+  message_count: number;
   created_at: string;
   updated_at: string;
   last_message?: ConversationLastMessage;
 }
 
-export interface FrameInfo {
-  id: number;
-  summary: string | null;
-  created_at: string | null;
-  updated_at: string | null;
-}
-
 export interface ConversationDetail {
   id: number;
   title: string;
+  main_agent_id: number | null;
   created_at: string;
   messages: Message[];
-  frames: Record<number, FrameInfo>;
   total_messages: number;
   offset: number;
   limit: number;
@@ -137,11 +130,12 @@ export interface Agent {
   is_system: boolean;
   use_deferred_tools: boolean;
   agent_type: string;  // "main" or "sub"
-  // Personality fields (merged from Persona)
+  // Personality fields — MainAgent only
   voice_reference: string | null;
   avatar_uuid: string | null;
   character_config: CharacterConfigDTO | null;
   preferred_name: string | null;
+  trigger_word: string | null;  // First-message pick hint
 }
 
 // Character asset types (backend responses)
@@ -182,11 +176,12 @@ export interface AgentCreate {
   think?: boolean;
   use_deferred_tools?: boolean;
   agent_type?: string;  // "main" or "sub"
-  // Personality fields
+  // Personality fields — MainAgent only
   voice_reference?: string;
   avatar_uuid?: string;
   character_config?: CharacterConfigDTO;
   preferred_name?: string;
+  trigger_word?: string;
 }
 
 export interface AgentUpdate {
@@ -201,11 +196,12 @@ export interface AgentUpdate {
   memory_enabled?: boolean;
   use_deferred_tools?: boolean;
   agent_type?: string;
-  // Personality fields
+  // Personality fields — MainAgent only
   voice_reference?: string | null;
   avatar_uuid?: string | null;
   character_config?: CharacterConfigDTO | null;
   preferred_name?: string | null;
+  trigger_word?: string | null;
 }
 
 // MCP Server types
@@ -335,7 +331,6 @@ export interface ContextBreakdownEvent {
   event_id: string;
   timestamp: string;
   conversation_id: number;
-  frame_id: number;
   turn: number;
   system_prompt_tokens: number;
   memory_tokens: number;

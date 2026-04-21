@@ -37,7 +37,6 @@ export interface ChatRequestEvent extends BaseEvent {
   text: string;
   model_name: string;
   conversation_id: number | null;
-  agent_id: number | null;
   images: string[]; // base64 encoded
 }
 
@@ -68,7 +67,6 @@ export interface StreamChunkEvent extends BaseEvent {
   tool_args: Record<string, unknown> | null;
   tool_status: string | null;  // "success" | "error" | "denied"
   conversation_id: number;
-  frame_id: number;
   images: string[] | null;
   token_count: number | null;
 }
@@ -85,7 +83,6 @@ export interface AgentSwitchEvent extends BaseEvent {
 export interface DoneEvent extends BaseEvent {
   type: 'done';
   conversation_id: number;
-  frame_id: number;
 }
 
 export interface ErrorEvent extends BaseEvent {
@@ -138,7 +135,6 @@ export interface ContextInfoEvent extends BaseEvent {
 export interface ContextBreakdownEvent extends BaseEvent {
   type: 'context_breakdown';
   conversation_id: number;
-  frame_id: number;
   turn: number;
   system_prompt_tokens: number;
   memory_tokens: number;
@@ -160,7 +156,6 @@ export interface ConnectedEvent extends BaseEvent {
   type: 'connected';
   chat_active: boolean;
   conversation_id: number | null;
-  frame_id: number | null;
   vision_active: boolean;
   vision_config: {
     enable_face: boolean;
@@ -389,7 +384,6 @@ class WebSocketManager {
     text: string,
     modelName: string,
     conversationId: number | null = null,
-    agentId: number | null = null,
     images: string[] = [],
     contextFiles: Array<Record<string, unknown>> = [],
   ): Promise<void> {
@@ -401,7 +395,6 @@ class WebSocketManager {
       text,
       model_name: modelName,
       conversation_id: conversationId,
-      agent_id: agentId,
       images,
       context_files: contextFiles.length > 0 ? contextFiles : undefined,
     });

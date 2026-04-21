@@ -760,7 +760,6 @@ export function useStreamingChat({
         text,
         '', // Model determined by backend
         activeConversationId,
-        agentId, // Specific agent, or null to let the routing LLM pick
         imageBase64,
         contextFiles,
       );
@@ -807,7 +806,6 @@ export function useStreamingChat({
         trimmed,
         '',
         activeConversationId,
-        agentId,
         imageBase64,
       );
       return;
@@ -923,7 +921,7 @@ export function useStreamingChat({
       setStreamingThinking('');
       setJustFinishedStreaming(false);
 
-      await wsManager.sendChatRequest(text, '', activeConversationId, agentId, [], contextFiles);
+      await wsManager.sendChatRequest(text, '', activeConversationId, [], contextFiles);
     } catch (e) {
       console.error('Failed to resend message:', e);
       setIsStreaming(false);

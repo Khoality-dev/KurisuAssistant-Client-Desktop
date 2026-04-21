@@ -44,7 +44,6 @@ import { useAgentStore } from '../../store/agentStore';
 import { useStreamingChat } from '../../hooks/useStreamingChat';
 import { InteractiveCallBar } from '../InteractiveCallBar';
 import { MessageBubble } from './MessageBubble';
-import { FrameSeparator } from '../FrameSeparator';
 import { SelectionChips } from './SelectionChips';
 import { ChatComposer } from './ChatComposer';
 import { ToolApprovalBar, ApprovalRequest } from './ToolApprovalBar';
@@ -59,7 +58,6 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ characterWindowOpen = fa
   const agentId = agentIdProp ?? storeAgentId;
   const {
     messages,
-    frames,
     currentConversation,
     hasMoreMessages,
     isLoadingMessages,
@@ -335,20 +333,8 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ characterWindowOpen = fa
       ? streaming.streamingMessages[streaming.streamingMessages.length - 1]
       : null;
     const elements: React.ReactNode[] = [];
-    let lastFrameId: number | undefined;
 
     combined.forEach((message, index) => {
-      const currentFrameId = message.frame_id;
-      if (currentFrameId && currentFrameId !== lastFrameId && lastFrameId !== undefined) {
-        const frameInfo = frames[currentFrameId];
-        if (frameInfo) {
-          elements.push(
-            <FrameSeparator key={`frame-sep-${currentFrameId}`} frame={frameInfo} />
-          );
-        }
-      }
-      lastFrameId = currentFrameId;
-
       const isActiveStreaming = message === activeStreamingMsg;
       const isCompacted = message.id != null && message.id <= compactedUpToId;
       const prevMessage = index > 0 ? combined[index - 1] : null;
@@ -390,7 +376,6 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ characterWindowOpen = fa
     displayedMessages,
     streaming.streamingMessages,
     streaming.isStreaming,
-    frames,
     streaming.streamingThinking,
     streaming.streamingContent,
     streaming.justFinishedStreaming,

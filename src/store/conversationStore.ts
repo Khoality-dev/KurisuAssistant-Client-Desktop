@@ -1,11 +1,10 @@
 import { create } from 'zustand';
 import { apiClient } from '../api/client';
-import type { Conversation, FrameInfo, Message } from '../api/types';
+import type { Conversation, Message } from '../api/types';
 
 interface ConversationState {
   currentConversation: Conversation | null;
   messages: Message[];
-  frames: Record<number, FrameInfo>;
 
   // Pagination state
   totalMessages: number;
@@ -29,18 +28,24 @@ interface ConversationState {
   updateCompactionData: (compactedUpToId: number, compactedContext: string) => void;
 }
 
+const emptyConversation = (id: number, title = '', main_agent_id: number | null = null): Conversation => ({
+  id,
+  title,
+  main_agent_id,
+  message_count: 0,
+  created_at: '',
+  updated_at: '',
+});
+
 export const useConversationStore = create<ConversationState>((set, get) => ({
   currentConversation: null,
   messages: [],
-  frames: {},
 
-  // Pagination state initialization
   totalMessages: 0,
   hasMoreMessages: false,
   messagesOffset: 0,
   isLoadingMessages: false,
 
-  // Context window data
   compactedUpToId: 0,
   compactedContext: '',
   systemPromptTokenCount: 0,
@@ -49,9 +54,15 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
     const data = await apiClient.getConversation(id, 20, 0);
 
     set({
-      currentConversation: { id, title: data.title, frame_count: 0, created_at: data.created_at, updated_at: '' },
+      currentConversation: {
+        id,
+        title: data.title,
+        main_agent_id: data.main_agent_id,
+        message_count: data.total_messages,
+        created_at: data.created_at,
+        updated_at: '',
+      },
       messages: data.messages,
-      frames: data.frames || {},
       totalMessages: data.total_messages,
       hasMoreMessages: data.has_more,
       messagesOffset: data.limit,
@@ -65,7 +76,6 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
   loadMoreMessages: async () => {
     const { currentConversation, messagesOffset, isLoadingMessages, hasMoreMessages } = get();
 
-    // Don't load if already loading or no more messages
     if (isLoadingMessages || !hasMoreMessages || !currentConversation) {
       return;
     }
@@ -79,10 +89,8 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
         messagesOffset
       );
 
-      // Prepend older messages to the beginning, merge frames
       set((state) => ({
         messages: [...data.messages, ...state.messages],
-        frames: { ...state.frames, ...(data.frames || {}) },
         hasMoreMessages: data.has_more,
         messagesOffset: state.messagesOffset + data.messages.length,
         isLoadingMessages: false,
@@ -95,14 +103,13 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
 
   deleteConversation: async (id: number) => {
     await apiClient.deleteConversation(id);
-    set({ currentConversation: null, messages: [], frames: {} });
+    set({ currentConversation: null, messages: [] });
   },
 
   clearCurrentConversation: () => {
     set({
       currentConversation: null,
       messages: [],
-      frames: {},
       totalMessages: 0,
       hasMoreMessages: false,
       messagesOffset: 0,
@@ -139,7 +146,7 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
   },
 
   setCurrentConversationId: (id: number) => {
-    set({ currentConversation: { id, title: '', frame_count: 0, created_at: '', updated_at: '' } });
+    set({ currentConversation: emptyConversation(id) });
   },
 
   updateCompactionData: (compactedUpToId: number, compactedContext: string) => {
