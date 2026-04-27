@@ -4,9 +4,6 @@ import {
   Typography,
   Snackbar,
   Alert,
-  ToggleButtonGroup,
-  ToggleButton,
-  Collapse,
   Paper,
   IconButton,
   TextField,
@@ -22,8 +19,6 @@ import {
   Tooltip,
   LinearProgress,
 } from '@mui/material';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import SearchIcon from '@mui/icons-material/Search';
 import CloseIcon from '@mui/icons-material/Close';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
@@ -68,9 +63,6 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ characterWindowOpen = fa
   const { compactedUpToId, compactedContext } = useConversationStore();
   const contextSize = useAuthStore((s) => s.user?.context_size) || 8192;
 
-  // Display mode: "all" shows full history, "context" shows only LLM context window
-  const [displayMode, setDisplayMode] = useState<'all' | 'context'>('all');
-  const [contextBannerExpanded, setContextBannerExpanded] = useState(false);
   const [breakdownDialogOpen, setBreakdownDialogOpen] = useState(false);
   const [breakdownData, setBreakdownData] = useState<{
     agent_name: string;
@@ -170,12 +162,6 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ characterWindowOpen = fa
     pushAgentCharacterConfig,
   });
 
-  // Reset display mode on conversation change
-  useEffect(() => {
-    setDisplayMode('all');
-    setContextBannerExpanded(false);
-  }, [currentConversation?.id]);
-
   // Fetch context breakdown when dialog opens
   useEffect(() => {
     if (!breakdownDialogOpen || !currentConversation?.id) return;
@@ -192,13 +178,6 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ characterWindowOpen = fa
         setBreakdownLoading(false);
       });
   }, [breakdownDialogOpen, currentConversation?.id, agentId]);
-
-  // Scroll to bottom when switching display mode (after render settles)
-  useEffect(() => {
-    requestAnimationFrame(() => {
-      streaming.messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
-    });
-  }, [displayMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Clear active speaker when TTS queue finishes playing
   useEffect(() => {
@@ -307,14 +286,6 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ characterWindowOpen = fa
     setHostApproval(null);
   }, [hostApproval]);
 
-  // Filter messages based on display mode
-  const displayedMessages = useMemo(() => {
-    if (displayMode === 'context') {
-      return messages.filter(m => (m.id ?? Infinity) > compactedUpToId);
-    }
-    return messages;
-  }, [messages, displayMode, compactedUpToId]);
-
   // Token count: frontend estimate from persisted messages + live streaming content
   const tokenCount = useMemo(() => {
     const contextMsgs = messages.filter(m => (m.id ?? Infinity) > compactedUpToId);
@@ -327,8 +298,8 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ characterWindowOpen = fa
 
   // Message rendering
   const messageElements = useMemo(() => {
-    const combined = [...displayedMessages, ...streaming.streamingMessages];
-    const displayedCount = displayedMessages.length;
+    const combined = [...messages, ...streaming.streamingMessages];
+    const displayedCount = messages.length;
     const activeStreamingMsg = streaming.isStreaming && streaming.streamingMessages.length > 0
       ? streaming.streamingMessages[streaming.streamingMessages.length - 1]
       : null;
@@ -373,7 +344,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ characterWindowOpen = fa
 
     return elements;
   }, [
-    displayedMessages,
+    messages,
     streaming.streamingMessages,
     streaming.isStreaming,
     streaming.streamingThinking,
@@ -401,35 +372,12 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ characterWindowOpen = fa
         minWidth: 0,
       }}
     >
-      {isLoadingMessages && displayMode === 'all' && (
+      {isLoadingMessages && (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
           <Typography variant="body2" color="text.secondary">
             Loading earlier messages...
           </Typography>
         </Box>
-      )}
-
-      {displayMode === 'context' && compactedContext && (
-        <Paper variant="outlined" sx={{ mx: 1, mb: 2, p: 1.5, bgcolor: 'action.hover', borderStyle: 'dashed' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Typography variant="caption" color="text.secondary" fontWeight={600}>
-              Context Summary
-            </Typography>
-            <IconButton size="small" onClick={() => setContextBannerExpanded(v => !v)}>
-              {contextBannerExpanded ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
-            </IconButton>
-          </Box>
-          <Collapse in={contextBannerExpanded}>
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, whiteSpace: 'pre-wrap' }}>
-              {compactedContext}
-            </Typography>
-          </Collapse>
-          {!contextBannerExpanded && (
-            <Typography variant="body2" color="text.secondary" noWrap>
-              {compactedContext.slice(0, 150)}{compactedContext.length > 150 ? '...' : ''}
-            </Typography>
-          )}
-        </Paper>
       )}
 
       <AnimatePresence>
@@ -448,24 +396,14 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ characterWindowOpen = fa
       ))}
       <div ref={streaming.messagesEndRef} />
     </Box>
-  ), [isLoadingMessages, messageElements, displayMode, compactedContext, contextBannerExpanded, streaming.queuedMessages]);
+  ), [isLoadingMessages, messageElements, streaming.queuedMessages]);
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, height: '100%' }}>
 
-      {/* Display mode toggle + token usage */}
+      {/* Token usage */}
       {currentConversation && (
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 2, py: 0.5 }}>
-          <ToggleButtonGroup
-            value={displayMode}
-            exclusive
-            onChange={(_, v) => v && setDisplayMode(v)}
-            size="small"
-            sx={{ '& .MuiToggleButton-root': { px: 1.5, py: 0.25, fontSize: '0.7rem', textTransform: 'none' } }}
-          >
-            <ToggleButton value="all">All</ToggleButton>
-            <ToggleButton value="context">Context</ToggleButton>
-          </ToggleButtonGroup>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', px: 2, py: 0.5 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
             <Typography
               variant="caption"

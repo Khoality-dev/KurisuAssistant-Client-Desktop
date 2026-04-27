@@ -5,8 +5,6 @@
  * Add new commands to the `commands` array below.
  */
 
-import { wsManager } from '../api/websocket';
-
 export interface CommandContext {
   activeConversationId: number | null;
   agentId: number | null;
@@ -19,17 +17,6 @@ interface Command {
 }
 
 const commands: Command[] = [
-  {
-    name: 'compact',
-    description: 'Compact conversation context to free up token space',
-    execute: (_args, ctx) => {
-      if (ctx.activeConversationId) {
-        wsManager.send({ type: 'compact_context', conversation_id: ctx.activeConversationId });
-        return 'Compacting context...';
-      }
-      return 'No active conversation';
-    },
-  },
   {
     name: 'clear',
     description: 'Clear the current conversation',
