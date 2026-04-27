@@ -480,7 +480,9 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ characterWindowOpen = fa
         </Box>
       )}
 
-      {compactedContext && (
+      {/* Banner only on conversations created by compaction (seeded summary, no messages
+          rolled in). Old in-place compactions have compactedUpToId > 0. */}
+      {compactedContext && compactedUpToId === 0 && (
         <Paper
           variant="outlined"
           sx={{

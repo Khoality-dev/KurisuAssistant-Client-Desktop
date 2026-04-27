@@ -103,7 +103,15 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
 
   deleteConversation: async (id: number) => {
     await apiClient.deleteConversation(id);
-    set({ currentConversation: null, messages: [] });
+    set({
+      currentConversation: null,
+      messages: [],
+      totalMessages: 0,
+      hasMoreMessages: false,
+      messagesOffset: 0,
+      compactedUpToId: 0,
+      compactedContext: '',
+    });
   },
 
   clearCurrentConversation: () => {
