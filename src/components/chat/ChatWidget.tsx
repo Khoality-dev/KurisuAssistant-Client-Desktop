@@ -187,6 +187,13 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ characterWindowOpen = fa
     }
   }, [isQueueActive, streaming.isStreaming, setActiveAgentId, amplitudeRef]);
 
+  // /context slash command opens the breakdown dialog
+  useEffect(() => {
+    const handler = () => setBreakdownDialogOpen(true);
+    window.addEventListener('kurisu:open-context-breakdown', handler);
+    return () => window.removeEventListener('kurisu:open-context-breakdown', handler);
+  }, []);
+
   // Interactive ASR hook
   const asr = useInteractiveASR({
     agentId,
