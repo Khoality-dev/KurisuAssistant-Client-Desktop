@@ -9,27 +9,12 @@ import {
   DialogContent,
   DialogActions,
   Switch,
+  FormControlLabel,
 } from '@mui/material';
-import {
-  Badge as BadgeIcon,
-  OpenInFull as OpenInFullIcon,
-  CloseFullscreen as CloseFullscreenIcon,
-  PsychologyAlt as PsychologyIcon,
-  Save as SaveIcon,
-  Extension as ExtensionIcon,
-} from '@mui/icons-material';
+import { Save as SaveIcon } from '@mui/icons-material';
 import { ModelPicker } from '../ModelPicker';
 import { ToolGroupChecklist } from './ToolGroupChecklist';
 import type { ToolGroup } from './ToolGroupChecklist';
-
-const formSectionSx = {
-  p: 2.5,
-  borderRadius: 2,
-  border: '1px solid',
-  borderColor: 'divider',
-  backgroundColor: 'background.paper',
-  boxShadow: 'none',
-};
 
 interface AgentFormData {
   name: string;
@@ -54,8 +39,6 @@ interface AgentEditDialogProps {
   formData: AgentFormData;
   setFormData: React.Dispatch<React.SetStateAction<AgentFormData>>;
   isSystemAgent: boolean;
-  isPromptEditorExpanded: boolean;
-  setIsPromptEditorExpanded: (value: boolean | ((current: boolean) => boolean)) => void;
   models: Array<{ name: string; provider: string }>;
   toolGroups: ToolGroup[];
   onSave: () => void;
@@ -70,8 +53,6 @@ export const AgentEditDialog: React.FC<AgentEditDialogProps> = ({
   formData,
   setFormData,
   isSystemAgent,
-  isPromptEditorExpanded,
-  setIsPromptEditorExpanded,
   models,
   toolGroups,
   onSave,
@@ -79,245 +60,140 @@ export const AgentEditDialog: React.FC<AgentEditDialogProps> = ({
   onSuccess,
   onError,
 }) => {
+  const isSub = formData.agent_type === 'sub';
+
   return (
-    <Dialog
-      open={open}
-      onClose={onClose}
-      maxWidth="md"
-      fullWidth
-      PaperProps={{ sx: { borderRadius: 3, overflow: 'hidden' } }}
-    >
-      <DialogTitle
-        sx={{
-          px: 3,
-          py: 2,
-          borderBottom: '1px solid',
-          borderColor: 'divider',
-          backgroundColor: 'background.paper',
-        }}
-      >
-        <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap' }}>
-          <Box>
-            <Typography variant="h6">
-              Edit Agent
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, maxWidth: 520 }}>
-              Refine identity, prompting, tools, and memory settings.
-            </Typography>
-          </Box>
-          <Typography variant="caption" color="text.secondary" sx={{ pt: 0.5 }}>
-            {isSystemAgent ? 'System agent' : 'Custom agent'}
-          </Typography>
-        </Box>
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 2 }}>
+        <span>Edit {isSub ? 'Sub-Agent' : 'Main Agent'}</span>
+        {isSystemAgent && (
+          <Typography variant="caption" color="text.secondary">System</Typography>
+        )}
       </DialogTitle>
-      <DialogContent sx={{ p: 3 }}>
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
-          <Box sx={formSectionSx}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-              <BadgeIcon fontSize="small" color="primary" />
-              <Typography variant="h6">Identity</Typography>
-            </Box>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <TextField
-                label="Agent Name"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                fullWidth
-                required
-                disabled={isSystemAgent}
-                helperText={isSystemAgent ? 'System agent name cannot be changed' : 'Display name used across the app'}
-              />
-              <TextField
-                label="Description"
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                fullWidth
-                helperText={
-                  formData.agent_type === 'sub'
-                    ? 'Shown to main agents as the sub-agent tool description'
-                    : "Brief description of this agent's role"
-                }
-              />
-              {formData.agent_type === 'main' && (
-                <TextField
-                  label="Trigger Word"
-                  value={formData.trigger_word || ''}
-                  onChange={(e) => setFormData({ ...formData, trigger_word: e.target.value || null })}
-                  fullWidth
-                  helperText="If a new conversation's first message contains this word, this agent is picked. Leave blank for random pick."
-                />
-              )}
-            </Box>
+
+      <DialogContent>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, mt: 1 }}>
+          <TextField
+            label="Name"
+            value={formData.name}
+            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            fullWidth
+            required
+            disabled={isSystemAgent}
+          />
+
+          <TextField
+            label="Description"
+            value={formData.description}
+            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            fullWidth
+          />
+
+          {!isSub && (
+            <TextField
+              label="Trigger word"
+              value={formData.trigger_word || ''}
+              onChange={(e) => setFormData({ ...formData, trigger_word: e.target.value || null })}
+              fullWidth
+              helperText="Picked when the first message of a new conversation contains this word."
+            />
+          )}
+
+          <TextField
+            label={isSub ? 'Task instructions' : 'System prompt'}
+            value={isSystemAgent ? 'System-managed prompt' : formData.system_prompt}
+            onChange={(e) => setFormData({ ...formData, system_prompt: e.target.value })}
+            multiline
+            minRows={6}
+            maxRows={16}
+            fullWidth
+            disabled={isSystemAgent}
+            InputProps={{
+              sx: {
+                alignItems: 'flex-start',
+                '& textarea': {
+                  fontFamily: '"Consolas", "SFMono-Regular", "Roboto Mono", monospace',
+                  lineHeight: 1.6,
+                },
+              },
+            }}
+          />
+
+          <ModelPicker
+            label="Model"
+            value={formData.model_name}
+            models={models}
+            onChange={(model_name) => setFormData({ ...formData, model_name })}
+            onRefresh={onRefreshModels}
+            onSuccess={onSuccess}
+            onError={onError}
+            required
+          />
+
+          <Box>
+            <Typography variant="body2" sx={{ mb: 1, fontWeight: 500 }}>Tools</Typography>
+            <ToolGroupChecklist
+              groups={toolGroups}
+              enabledTools={formData.available_tools}
+              onChange={(enabled) => setFormData({ ...formData, available_tools: enabled })}
+            />
           </Box>
 
-          <Box sx={formSectionSx}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-              <PsychologyIcon fontSize="small" color="primary" />
-              <Typography variant="h6">Behavior</Typography>
-            </Box>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <Box
-                sx={{
-                  p: 2,
-                  borderRadius: 2,
-                  backgroundColor: 'background.paper',
-                  border: '1px solid',
-                  borderColor: 'divider',
-                }}
-              >
-                <Box
-                  sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: 1,
-                    flexWrap: 'wrap',
-                    mb: 1.5,
-                  }}
-                >
-                  <Box>
-                    <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                      System Prompt
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      Define persona, boundaries, tone, and workflow expectations.
-                    </Typography>
-                  </Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Typography variant="caption" color="text.secondary">
-                      {(isSystemAgent ? 'System-managed prompt' : formData.system_prompt).length} chars
-                    </Typography>
-                    <Button
-                      size="small"
-                      variant="text"
-                      startIcon={isPromptEditorExpanded ? <CloseFullscreenIcon /> : <OpenInFullIcon />}
-                      onClick={() => setIsPromptEditorExpanded((current: boolean) => !current)}
-                      disabled={isSystemAgent}
-                    >
-                      {isPromptEditorExpanded ? 'Compact' : 'Expand'}
-                    </Button>
-                  </Box>
-                </Box>
-                <TextField
-                  label={isPromptEditorExpanded ? 'Prompt Workspace' : 'System Prompt'}
-                  value={isSystemAgent ? 'System-managed prompt' : formData.system_prompt}
-                  onChange={(e) => setFormData({ ...formData, system_prompt: e.target.value })}
-                  multiline
-                  minRows={isPromptEditorExpanded ? 12 : 6}
-                  maxRows={isPromptEditorExpanded ? 20 : 10}
-                  fullWidth
-                  disabled={isSystemAgent}
-                  helperText={isSystemAgent ? 'System agents use built-in prompts' : 'Write instructions in plain language. Include role, response style, constraints, and when to use tools.'}
-                  InputProps={{
-                    sx: {
-                      alignItems: 'flex-start',
-                      '& textarea': {
-                        fontFamily: '"Consolas", "SFMono-Regular", "Roboto Mono", monospace',
-                        lineHeight: 1.6,
-                      },
-                    },
-                  }}
+          <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={formData.think}
+                  onChange={(e) => setFormData({ ...formData, think: e.target.checked })}
                 />
-              </Box>
-              <ModelPicker
-                label="Model"
-                value={formData.model_name}
-                models={models}
-                onChange={(model_name) => setFormData({ ...formData, model_name })}
-                onRefresh={onRefreshModels}
-                onSuccess={(message) => {
-                  onSuccess(message);
-                }}
-                onError={onError}
-                required
-              />
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, p: 2, borderRadius: 2, backgroundColor: 'background.default', border: '1px solid', borderColor: 'divider' }}>
-                <Box>
-                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                    Extended Thinking
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    Allow this agent to use longer reasoning traces when the backend supports it.
-                  </Typography>
-                </Box>
-                <Switch checked={formData.think} onChange={(e) => setFormData({ ...formData, think: e.target.checked })} />
-              </Box>
-            </Box>
+              }
+              label="Extended thinking"
+            />
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={formData.use_deferred_tools}
+                  onChange={(e) => setFormData({ ...formData, use_deferred_tools: e.target.checked })}
+                />
+              }
+              label="Deferred tools"
+            />
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={formData.memory_enabled}
+                  onChange={(e) => setFormData({ ...formData, memory_enabled: e.target.checked })}
+                />
+              }
+              label="Memory"
+            />
           </Box>
 
-          <Box sx={formSectionSx}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-              <ExtensionIcon fontSize="small" color="primary" />
-              <Typography variant="h6">Tools & Memory</Typography>
-            </Box>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <Box>
-                <ToolGroupChecklist
-                  groups={toolGroups}
-                  enabledTools={formData.available_tools}
-                  onChange={(enabled) => setFormData({ ...formData, available_tools: enabled })}
-                />
-                <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
-                  Uncheck tools this agent should not use.
-                </Typography>
-              </Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, p: 2, borderRadius: 2, backgroundColor: 'background.default', border: '1px solid', borderColor: 'divider' }}>
-                <Box>
-                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                    Deferred Tools
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    Only send tool names to the model. It discovers schemas on demand, preserving KV cache.
-                  </Typography>
-                </Box>
-                <Switch checked={formData.use_deferred_tools} onChange={(e) => setFormData({ ...formData, use_deferred_tools: e.target.checked })} />
-              </Box>
-              <Box sx={{ p: 2, borderRadius: 2, backgroundColor: 'background.default', border: '1px solid', borderColor: 'divider' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
-                  <Box>
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                      Agent Memory
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      Keep long-term notes that help this agent stay consistent over time.
-                    </Typography>
-                  </Box>
-                  <Switch checked={formData.memory_enabled} onChange={(e) => setFormData({ ...formData, memory_enabled: e.target.checked })} />
-                </Box>
-                {formData.memory_enabled && (
-                  <TextField
-                    label="Memory"
-                    value={formData.memory}
-                    onChange={(e) => setFormData({ ...formData, memory: e.target.value })}
-                    multiline
-                    minRows={4}
-                    maxRows={10}
-                    fullWidth
-                    placeholder="No memories yet. Memory is automatically built from conversations."
-                    helperText="Auto-updated after conversations. You can also edit manually."
-                    sx={{ mt: 2 }}
-                  />
-                )}
-              </Box>
-            </Box>
-          </Box>
+          {formData.memory_enabled && (
+            <TextField
+              label="Memory notes"
+              value={formData.memory}
+              onChange={(e) => setFormData({ ...formData, memory: e.target.value })}
+              multiline
+              minRows={4}
+              maxRows={10}
+              fullWidth
+              placeholder="No memories yet. Auto-built from conversations — you can also edit manually."
+            />
+          )}
         </Box>
       </DialogContent>
-      <DialogActions sx={{ px: 3, py: 2, borderTop: '1px solid', borderColor: 'divider', justifyContent: 'space-between' }}>
-        <Typography variant="caption" color="text.secondary" sx={{ mr: 2 }}>
-          Changes apply immediately after saving.
-        </Typography>
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button onClick={onClose}>Cancel</Button>
-          <Button
-            variant="contained"
-            startIcon={<SaveIcon />}
-            onClick={onSave}
-            disabled={!formData.name.trim() || !formData.model_name.trim()}
-          >
-            Save Changes
-          </Button>
-        </Box>
+
+      <DialogActions>
+        <Button onClick={onClose}>Cancel</Button>
+        <Button
+          variant="contained"
+          startIcon={<SaveIcon />}
+          onClick={onSave}
+          disabled={!formData.name.trim() || !formData.model_name.trim()}
+        >
+          Save
+        </Button>
       </DialogActions>
     </Dialog>
   );

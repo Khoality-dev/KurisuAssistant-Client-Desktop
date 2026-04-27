@@ -95,8 +95,6 @@ export const AgentsSection: React.FC = () => {
     trigger_word: null,
   });
 
-  const [isPromptEditorExpanded, setIsPromptEditorExpanded] = useState(false);
-
   const toolGroups = useMemo(() => buildToolGroups(availableTools, mcpServerMap), [availableTools, mcpServerMap]);
 
   useEffect(() => {
@@ -299,7 +297,6 @@ export const AgentsSection: React.FC = () => {
       trigger_word: null,
     });
     setSelectedAgent(null);
-    setIsPromptEditorExpanded(false);
   };
 
   const openEditDialog = (agent: Agent) => {
@@ -320,7 +317,6 @@ export const AgentsSection: React.FC = () => {
       preferred_name: agent.preferred_name || null,
       trigger_word: (agent as any).trigger_word || null,
     });
-    setIsPromptEditorExpanded(false);
     setEditDialogOpen(true);
     loadTools();
   };
@@ -717,8 +713,6 @@ export const AgentsSection: React.FC = () => {
         formData={formData}
         setFormData={setFormData}
         isSystemAgent={isSystemAgent}
-        isPromptEditorExpanded={isPromptEditorExpanded}
-        setIsPromptEditorExpanded={setIsPromptEditorExpanded}
         models={models}
         toolGroups={toolGroups}
         onSave={handleUpdateAgent}
