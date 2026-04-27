@@ -162,7 +162,6 @@ export const AgentEditDialog: React.FC<AgentEditDialogProps> = ({
             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             fullWidth
             required
-            disabled={isSystemAgent}
           />
 
           <TextField

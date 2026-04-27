@@ -19,6 +19,7 @@ import {
   Tooltip,
   FormControlLabel,
   Switch,
+  Avatar,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -28,6 +29,7 @@ import {
   Settings as SettingsIcon,
   FileDownload as ExportIcon,
   FileUpload as ImportIcon,
+  SmartToy as AgentIcon,
 } from '@mui/icons-material';
 import { motion, AnimatePresence } from 'framer-motion';
 import { apiClient } from '../../api/client';
@@ -473,9 +475,24 @@ export const AgentsSection: React.FC = () => {
                 />
               )}
               <CardContent sx={{ pt: 3 }}>
-                <Typography variant="h6" gutterBottom>
-                  {agent.name}
-                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+                  <Avatar
+                    src={agent.avatar_uuid ? apiClient.getImageUrl(agent.avatar_uuid) : undefined}
+                    sx={{
+                      width: 44,
+                      height: 44,
+                      bgcolor: (t) => (t.palette.mode === 'light' ? '#F3F4F6' : '#262626'),
+                      flexShrink: 0,
+                    }}
+                  >
+                    {!agent.avatar_uuid && (
+                      <AgentIcon sx={{ fontSize: 22, color: 'text.secondary' }} />
+                    )}
+                  </Avatar>
+                  <Typography variant="h6" sx={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {agent.name}
+                  </Typography>
+                </Box>
                 {agent.description && (
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
                     {agent.description}
