@@ -18,6 +18,10 @@ import {
   Chip,
   Tooltip,
   LinearProgress,
+  List,
+  ListItemButton,
+  ListItemText,
+  Divider,
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import CloseIcon from '@mui/icons-material/Close';
@@ -29,6 +33,8 @@ import { AnimatePresence } from 'framer-motion';
 import { useConversationStore } from '../../store/conversationStore';
 import { useAuthStore } from '../../store/authStore';
 import { apiClient } from '../../api/client';
+import type { Conversation } from '../../api/types';
+import { storage } from '../../utils/storage';
 
 import { useTTS } from '../../hooks/useTTS';
 import { useVisionStore } from '../../store/visionStore';
@@ -64,6 +70,9 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ characterWindowOpen = fa
   const contextSize = useAuthStore((s) => s.user?.context_size) || 8192;
 
   const [breakdownDialogOpen, setBreakdownDialogOpen] = useState(false);
+  const [resumeDialogOpen, setResumeDialogOpen] = useState(false);
+  const [resumeLoading, setResumeLoading] = useState(false);
+  const [resumeConversations, setResumeConversations] = useState<Conversation[]>([]);
   const [breakdownData, setBreakdownData] = useState<{
     agent_name: string;
     system_prompt_tokens: number;
@@ -193,6 +202,35 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ characterWindowOpen = fa
     window.addEventListener('kurisu:open-context-breakdown', handler);
     return () => window.removeEventListener('kurisu:open-context-breakdown', handler);
   }, []);
+
+  // /resume slash command opens the conversation picker
+  useEffect(() => {
+    const handler = () => setResumeDialogOpen(true);
+    window.addEventListener('kurisu:open-resume-picker', handler);
+    return () => window.removeEventListener('kurisu:open-resume-picker', handler);
+  }, []);
+
+  // Fetch conversations when the resume dialog opens
+  useEffect(() => {
+    if (!resumeDialogOpen) return;
+    setResumeLoading(true);
+    apiClient.getConversations(agentId ?? undefined)
+      .then((convs) => setResumeConversations(convs))
+      .catch((err) => {
+        console.error('Failed to load conversations:', err);
+        setResumeConversations([]);
+      })
+      .finally(() => setResumeLoading(false));
+  }, [resumeDialogOpen, agentId]);
+
+  const handleResumeSelect = useCallback(async (conv: Conversation) => {
+    setResumeDialogOpen(false);
+    if (conv.id === currentConversation?.id) return;
+    await loadConversation(conv.id);
+    if (agentId) {
+      storage.setAgentConversationId(agentId, conv.id);
+    }
+  }, [agentId, currentConversation?.id, loadConversation]);
 
   // Interactive ASR hook
   const asr = useInteractiveASR({
@@ -690,6 +728,71 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ characterWindowOpen = fa
             <Typography color="text.secondary">
               {currentConversation ? 'Failed to load context breakdown.' : 'Select a conversation to see context breakdown.'}
             </Typography>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Resume — Conversation Picker */}
+      <Dialog
+        open={resumeDialogOpen}
+        onClose={() => setResumeDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          Resume Conversation
+          <IconButton size="small" onClick={() => setResumeDialogOpen(false)}>
+            <CloseIcon fontSize="small" />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent dividers sx={{ p: 0 }}>
+          {resumeLoading ? (
+            <Box sx={{ p: 4 }}>
+              <LinearProgress />
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 2, textAlign: 'center' }}>
+                Loading conversations...
+              </Typography>
+            </Box>
+          ) : resumeConversations.length === 0 ? (
+            <Typography color="text.secondary" sx={{ p: 3, textAlign: 'center' }}>
+              No previous conversations.
+            </Typography>
+          ) : (
+            <List disablePadding>
+              {resumeConversations.map((conv, idx) => {
+                const isCurrent = conv.id === currentConversation?.id;
+                const updated = conv.updated_at ? new Date(conv.updated_at).toLocaleString() : '';
+                const preview = conv.last_message?.content?.slice(0, 80) || '';
+                return (
+                  <React.Fragment key={conv.id}>
+                    {idx > 0 && <Divider component="li" />}
+                    <ListItemButton
+                      onClick={() => handleResumeSelect(conv)}
+                      selected={isCurrent}
+                      sx={{ py: 1.25 }}
+                    >
+                      <ListItemText
+                        primary={
+                          <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 2 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {conv.title || 'Untitled'}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary" sx={{ flexShrink: 0 }}>
+                              {updated}
+                            </Typography>
+                          </Box>
+                        }
+                        secondary={preview && (
+                          <Typography variant="caption" color="text.secondary" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>
+                            {preview}
+                          </Typography>
+                        )}
+                      />
+                    </ListItemButton>
+                  </React.Fragment>
+                );
+              })}
+            </List>
           )}
         </DialogContent>
       </Dialog>

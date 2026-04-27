@@ -165,9 +165,10 @@ class APIClient {
     return response.data;
   }
 
-  async getConversations(): Promise<Conversation[]> {
+  async getConversations(agentId?: number): Promise<Conversation[]> {
     const response = await this.client.get<Conversation[]>('/conversations', {
       headers: this.getHeaders(),
+      params: agentId ? { agent_id: agentId } : undefined,
     });
     return response.data;
   }

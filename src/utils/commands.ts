@@ -38,24 +38,13 @@ const commands: Command[] = [
   },
   {
     name: 'resume',
-    description: 'Resume the latest conversation for the current agent',
-    execute: async (_args, ctx) => {
+    description: 'Pick a previous conversation to resume',
+    execute: (_args, ctx) => {
       if (!ctx.agentId) {
         return 'No agent selected';
       }
-      const { apiClient } = await import('../api/client');
-      const { useConversationStore } = await import('../store/conversationStore');
-      const { storage } = await import('./storage');
-      const latest = await apiClient.getLatestConversationForAgent(ctx.agentId);
-      if (!latest) {
-        return 'No previous conversation to resume';
-      }
-      if (latest.id === ctx.activeConversationId) {
-        return 'Already on the latest conversation';
-      }
-      await useConversationStore.getState().loadConversation(latest.id);
-      storage.setAgentConversationId(ctx.agentId, latest.id);
-      return `Resumed: ${latest.title || 'Untitled'}`;
+      window.dispatchEvent(new Event('kurisu:open-resume-picker'));
+      return '';
     },
   },
   {
