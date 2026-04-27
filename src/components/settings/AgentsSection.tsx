@@ -623,19 +623,6 @@ export const AgentsSection: React.FC = () => {
               }
             />
 
-            {/* Description */}
-            <TextField
-              label="Description"
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              fullWidth
-              helperText={
-                formData.agent_type === 'sub'
-                  ? "Short description of what this sub-agent does (shown to main agents as a tool)"
-                  : "Brief description of this agent's role"
-              }
-            />
-
             {/* Trigger word — main agents only */}
             {formData.agent_type === 'main' && (
               <TextField

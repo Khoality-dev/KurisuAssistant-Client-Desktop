@@ -164,13 +164,6 @@ export const AgentEditDialog: React.FC<AgentEditDialogProps> = ({
             required
           />
 
-          <TextField
-            label="Description"
-            value={formData.description}
-            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-            fullWidth
-          />
-
           {!isSub && (
             <TextField
               label="Trigger word"
