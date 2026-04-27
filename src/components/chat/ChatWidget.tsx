@@ -232,6 +232,19 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ characterWindowOpen = fa
     }
   }, [agentId, currentConversation?.id, loadConversation]);
 
+  // Esc closes the resume picker
+  useEffect(() => {
+    if (!resumeDialogOpen) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setResumeDialogOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [resumeDialogOpen]);
+
   // Interactive ASR hook
   const asr = useInteractiveASR({
     agentId,
@@ -444,7 +457,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ characterWindowOpen = fa
   ), [isLoadingMessages, messageElements, streaming.queuedMessages]);
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, height: '100%' }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, height: '100%', position: 'relative' }}>
 
       {/* Token usage */}
       {currentConversation && (
@@ -732,70 +745,81 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ characterWindowOpen = fa
         </DialogContent>
       </Dialog>
 
-      {/* Resume — Conversation Picker */}
-      <Dialog
-        open={resumeDialogOpen}
-        onClose={() => setResumeDialogOpen(false)}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          Resume Conversation
-          <IconButton size="small" onClick={() => setResumeDialogOpen(false)}>
-            <CloseIcon fontSize="small" />
-          </IconButton>
-        </DialogTitle>
-        <DialogContent dividers sx={{ p: 0 }}>
-          {resumeLoading ? (
-            <Box sx={{ p: 4 }}>
-              <LinearProgress />
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 2, textAlign: 'center' }}>
-                Loading conversations...
+      {/* Resume picker — full-pane overlay, dismiss with Esc */}
+      {resumeDialogOpen && (
+        <Box
+          sx={{
+            position: 'absolute',
+            inset: 0,
+            zIndex: 5,
+            bgcolor: 'background.default',
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 3, py: 2, borderBottom: 1, borderColor: 'divider' }}>
+            <Box>
+              <Typography variant="h6">Resume Conversation</Typography>
+              <Typography variant="caption" color="text.secondary">
+                Press Esc to cancel
               </Typography>
             </Box>
-          ) : resumeConversations.length === 0 ? (
-            <Typography color="text.secondary" sx={{ p: 3, textAlign: 'center' }}>
-              No previous conversations.
-            </Typography>
-          ) : (
-            <List disablePadding>
-              {resumeConversations.map((conv, idx) => {
-                const isCurrent = conv.id === currentConversation?.id;
-                const updated = conv.updated_at ? new Date(conv.updated_at).toLocaleString() : '';
-                const preview = conv.last_message?.content?.slice(0, 80) || '';
-                return (
-                  <React.Fragment key={conv.id}>
-                    {idx > 0 && <Divider component="li" />}
-                    <ListItemButton
-                      onClick={() => handleResumeSelect(conv)}
-                      selected={isCurrent}
-                      sx={{ py: 1.25 }}
-                    >
-                      <ListItemText
-                        primary={
-                          <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 2 }}>
-                            <Typography variant="body2" sx={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {conv.title || 'Untitled'}
+            <IconButton size="small" onClick={() => setResumeDialogOpen(false)}>
+              <CloseIcon fontSize="small" />
+            </IconButton>
+          </Box>
+          <Box sx={{ flex: 1, overflowY: 'auto' }}>
+            {resumeLoading ? (
+              <Box sx={{ p: 4 }}>
+                <LinearProgress />
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 2, textAlign: 'center' }}>
+                  Loading conversations...
+                </Typography>
+              </Box>
+            ) : resumeConversations.length === 0 ? (
+              <Typography color="text.secondary" sx={{ p: 4, textAlign: 'center' }}>
+                No previous conversations.
+              </Typography>
+            ) : (
+              <List disablePadding>
+                {resumeConversations.map((conv, idx) => {
+                  const isCurrent = conv.id === currentConversation?.id;
+                  const updated = conv.updated_at ? new Date(conv.updated_at).toLocaleString() : '';
+                  const preview = conv.last_message?.content?.slice(0, 80) || '';
+                  return (
+                    <React.Fragment key={conv.id}>
+                      {idx > 0 && <Divider component="li" />}
+                      <ListItemButton
+                        onClick={() => handleResumeSelect(conv)}
+                        selected={isCurrent}
+                        sx={{ py: 1.25, px: 3 }}
+                      >
+                        <ListItemText
+                          primary={
+                            <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 2 }}>
+                              <Typography variant="body2" sx={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {conv.title || 'Untitled'}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary" sx={{ flexShrink: 0 }}>
+                                {updated}
+                              </Typography>
+                            </Box>
+                          }
+                          secondary={preview && (
+                            <Typography variant="caption" color="text.secondary" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>
+                              {preview}
                             </Typography>
-                            <Typography variant="caption" color="text.secondary" sx={{ flexShrink: 0 }}>
-                              {updated}
-                            </Typography>
-                          </Box>
-                        }
-                        secondary={preview && (
-                          <Typography variant="caption" color="text.secondary" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>
-                            {preview}
-                          </Typography>
-                        )}
-                      />
-                    </ListItemButton>
-                  </React.Fragment>
-                );
-              })}
-            </List>
-          )}
-        </DialogContent>
-      </Dialog>
+                          )}
+                        />
+                      </ListItemButton>
+                    </React.Fragment>
+                  );
+                })}
+              </List>
+            )}
+          </Box>
+        </Box>
+      )}
     </Box>
   );
 };
