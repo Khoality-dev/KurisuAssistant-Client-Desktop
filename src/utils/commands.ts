@@ -74,6 +74,14 @@ const commands: Command[] = [
       return '';
     },
   },
+  {
+    name: 'agents',
+    description: 'Pick a main agent to chat with',
+    execute: () => {
+      window.dispatchEvent(new Event('kurisu:open-agent-picker'));
+      return '';
+    },
+  },
 ];
 
 /**

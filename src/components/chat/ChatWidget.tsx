@@ -22,12 +22,14 @@ import {
   ListItemButton,
   ListItemText,
   Divider,
+  Avatar,
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import CloseIcon from '@mui/icons-material/Close';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import SmartToyIcon from '@mui/icons-material/SmartToy';
 
 import { AnimatePresence } from 'framer-motion';
 import { useConversationStore } from '../../store/conversationStore';
@@ -74,6 +76,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ characterWindowOpen = fa
   const [resumeDialogOpen, setResumeDialogOpen] = useState(false);
   const [resumeLoading, setResumeLoading] = useState(false);
   const [resumeConversations, setResumeConversations] = useState<Conversation[]>([]);
+  const [agentPickerOpen, setAgentPickerOpen] = useState(false);
 
   // Message search
   const [searchOpen, setSearchOpen] = useState(false);
@@ -222,6 +225,34 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ characterWindowOpen = fa
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [resumeDialogOpen]);
+
+  // /agents slash command opens the agent picker
+  useEffect(() => {
+    const handler = () => setAgentPickerOpen(true);
+    window.addEventListener('kurisu:open-agent-picker', handler);
+    return () => window.removeEventListener('kurisu:open-agent-picker', handler);
+  }, []);
+
+  // Esc closes the agent picker
+  useEffect(() => {
+    if (!agentPickerOpen) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setAgentPickerOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [agentPickerOpen]);
+
+  const selectAgent = useAgentStore((s) => s.selectAgent);
+  const handleAgentPick = useCallback((id: number) => {
+    setAgentPickerOpen(false);
+    if (id !== storeAgentId) {
+      selectAgent(id);
+    }
+  }, [selectAgent, storeAgentId]);
 
   // Interactive ASR hook
   const asr = useInteractiveASR({
@@ -790,6 +821,87 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ characterWindowOpen = fa
                 })}
               </List>
             )}
+          </Box>
+        </Box>
+      )}
+
+      {/* Agent picker — full-pane overlay, dismiss with Esc */}
+      {agentPickerOpen && (
+        <Box
+          sx={{
+            position: 'absolute',
+            inset: 0,
+            zIndex: 5,
+            bgcolor: 'background.default',
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 3, py: 2, borderBottom: 1, borderColor: 'divider' }}>
+            <Box>
+              <Typography variant="h6">Select Agent</Typography>
+              <Typography variant="caption" color="text.secondary">
+                Press Esc to cancel
+              </Typography>
+            </Box>
+            <IconButton size="small" onClick={() => setAgentPickerOpen(false)}>
+              <CloseIcon fontSize="small" />
+            </IconButton>
+          </Box>
+          <Box sx={{ flex: 1, overflowY: 'auto' }}>
+            {(() => {
+              const mainAgents = agents.filter((a) => a.agent_type !== 'sub' && a.enabled);
+              if (mainAgents.length === 0) {
+                return (
+                  <Typography color="text.secondary" sx={{ p: 4, textAlign: 'center' }}>
+                    No main agents available.
+                  </Typography>
+                );
+              }
+              return (
+                <List disablePadding>
+                  {mainAgents.map((agent, idx) => {
+                    const isCurrent = agent.id === storeAgentId;
+                    return (
+                      <React.Fragment key={agent.id}>
+                        {idx > 0 && <Divider component="li" />}
+                        <ListItemButton
+                          onClick={() => handleAgentPick(agent.id)}
+                          selected={isCurrent}
+                          sx={{ py: 1.25, px: 3, gap: 1.5 }}
+                        >
+                          <Avatar
+                            src={agent.avatar_uuid ? apiClient.getImageUrl(agent.avatar_uuid) : undefined}
+                            sx={{
+                              width: 40,
+                              height: 40,
+                              bgcolor: (t) => (t.palette.mode === 'light' ? '#F3F4F6' : '#262626'),
+                              flexShrink: 0,
+                            }}
+                          >
+                            {!agent.avatar_uuid && (
+                              <SmartToyIcon sx={{ fontSize: 20, color: 'text.secondary' }} />
+                            )}
+                          </Avatar>
+                          <ListItemText
+                            primary={
+                              <Typography variant="body2" sx={{ fontWeight: isCurrent ? 600 : 500 }}>
+                                {agent.name}
+                              </Typography>
+                            }
+                            secondary={agent.description ? (
+                              <Typography variant="caption" color="text.secondary" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>
+                                {agent.description}
+                              </Typography>
+                            ) : null}
+                          />
+                        </ListItemButton>
+                      </React.Fragment>
+                    );
+                  })}
+                </List>
+              );
+            })()}
           </Box>
         </Box>
       )}
