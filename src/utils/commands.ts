@@ -19,21 +19,37 @@ interface Command {
 const commands: Command[] = [
   {
     name: 'clear',
-    description: 'Clear the current conversation',
+    description: 'Start a new empty conversation (keeps the current one in history)',
     execute: async (_args, ctx) => {
-      if (ctx.activeConversationId) {
-        const { useConversationStore } = await import('../store/conversationStore');
-        const { storage } = await import('./storage');
-        const convStore = useConversationStore.getState();
-        await convStore.deleteConversation(ctx.activeConversationId);
-        if (ctx.agentId) {
-          storage.clearAgentConversationId(ctx.agentId);
-        } else {
-          storage.clearAgentConversationId('group');
-        }
-        return 'Conversation cleared';
+      const { useConversationStore } = await import('../store/conversationStore');
+      const { storage } = await import('./storage');
+      const convStore = useConversationStore.getState();
+      convStore.clearCurrentConversation();
+      if (ctx.agentId) {
+        storage.clearAgentConversationId(ctx.agentId);
+      } else {
+        storage.clearAgentConversationId('group');
       }
-      return 'No active conversation';
+      return 'Started a new conversation';
+    },
+  },
+  {
+    name: 'delete',
+    description: 'Permanently delete the current conversation',
+    execute: async (_args, ctx) => {
+      if (!ctx.activeConversationId) {
+        return 'No active conversation';
+      }
+      const { useConversationStore } = await import('../store/conversationStore');
+      const { storage } = await import('./storage');
+      const convStore = useConversationStore.getState();
+      await convStore.deleteConversation(ctx.activeConversationId);
+      if (ctx.agentId) {
+        storage.clearAgentConversationId(ctx.agentId);
+      } else {
+        storage.clearAgentConversationId('group');
+      }
+      return 'Conversation deleted';
     },
   },
   {

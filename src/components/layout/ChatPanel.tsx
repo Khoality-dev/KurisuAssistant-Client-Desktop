@@ -2,25 +2,18 @@ import React, { useState } from 'react';
 import { Box, Typography, IconButton, Tooltip } from '@mui/material';
 import {
   Refresh as RefreshIcon,
-  Delete as DeleteIcon,
   Face as FaceIcon,
 } from '@mui/icons-material';
 import { useConversationStore } from '../../store/conversationStore';
 import { ChatWidget } from '../chat/ChatWidget';
 
 export const ChatPanel: React.FC = () => {
-  const { currentConversation, deleteConversation } = useConversationStore();
+  const { currentConversation } = useConversationStore();
   const [characterVisible, setCharacterVisible] = useState(false);
 
   const handleRefresh = () => {
     if (currentConversation?.id) {
       useConversationStore.getState().loadConversation(currentConversation.id);
-    }
-  };
-
-  const handleClear = async () => {
-    if (currentConversation?.id) {
-      await deleteConversation(currentConversation.id);
     }
   };
 
@@ -64,15 +57,6 @@ export const ChatPanel: React.FC = () => {
         <Tooltip title="Refresh">
           <IconButton size="small" onClick={handleRefresh} sx={{ color: 'text.secondary' }}>
             <RefreshIcon fontSize="small" />
-          </IconButton>
-        </Tooltip>
-        <Tooltip title="Clear conversation">
-          <IconButton
-            size="small"
-            onClick={handleClear}
-            sx={{ color: 'text.secondary', '&:hover': { color: 'error.main' } }}
-          >
-            <DeleteIcon fontSize="small" />
           </IconButton>
         </Tooltip>
       </Box>
