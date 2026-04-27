@@ -73,24 +73,6 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ characterWindowOpen = fa
   const [resumeDialogOpen, setResumeDialogOpen] = useState(false);
   const [resumeLoading, setResumeLoading] = useState(false);
   const [resumeConversations, setResumeConversations] = useState<Conversation[]>([]);
-  const [breakdownData, setBreakdownData] = useState<{
-    agent_name: string;
-    system_prompt_tokens: number;
-    memory_tokens: number;
-    compacted_context_tokens: number;
-    skills_tokens: number;
-    tools_guidance_tokens: number;
-    other_agents_tokens: number;
-    message_history_tokens: number;
-    message_count: number;
-    tool_schemas_tokens: number;
-    tool_count: number;
-    total_tokens: number;
-    context_limit: number;
-    loaded_tools: string[];
-    loaded_skills: string[];
-  } | null>(null);
-  const [breakdownLoading, setBreakdownLoading] = useState(false);
 
   // Message search
   const [searchOpen, setSearchOpen] = useState(false);
@@ -171,22 +153,13 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ characterWindowOpen = fa
     pushAgentCharacterConfig,
   });
 
-  // Fetch context breakdown when dialog opens
-  useEffect(() => {
-    if (!breakdownDialogOpen || !currentConversation?.id) return;
-    setBreakdownLoading(true);
-    apiClient.getContextBreakdown(currentConversation.id, agentId ?? undefined)
-      .then((data) => {
-        setBreakdownData(data);
-      })
-      .catch((err) => {
-        console.error('Failed to fetch context breakdown:', err);
-        setBreakdownData(null);
-      })
-      .finally(() => {
-        setBreakdownLoading(false);
-      });
-  }, [breakdownDialogOpen, currentConversation?.id, agentId]);
+  // Context breakdown is the latest cached event from streaming — no backend fetch
+  const agents = useAgentStore((s) => s.agents);
+  const breakdownAgentName = useMemo(() => {
+    const id = currentConversation?.main_agent_id ?? agentId;
+    return agents.find((a) => a.id === id)?.name || '';
+  }, [agents, currentConversation?.main_agent_id, agentId]);
+  const breakdownData = streaming.contextBreakdown;
 
   // Clear active speaker when TTS queue finishes playing
   useEffect(() => {
@@ -611,20 +584,13 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ characterWindowOpen = fa
         fullWidth
       >
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          Context Breakdown {breakdownData?.agent_name ? `- ${breakdownData.agent_name}` : ''}
+          Context Breakdown {breakdownAgentName ? `- ${breakdownAgentName}` : ''}
           <IconButton size="small" onClick={() => setBreakdownDialogOpen(false)}>
             <CloseIcon fontSize="small" />
           </IconButton>
         </DialogTitle>
         <DialogContent>
-          {breakdownLoading ? (
-            <Box sx={{ py: 4 }}>
-              <LinearProgress />
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 2, textAlign: 'center' }}>
-                Loading context breakdown...
-              </Typography>
-            </Box>
-          ) : breakdownData ? (
+          {breakdownData ? (
             <Box>
               {/* Progress bar */}
               <Box sx={{ mb: 2 }}>
@@ -739,7 +705,9 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ characterWindowOpen = fa
             </Box>
           ) : (
             <Typography color="text.secondary">
-              {currentConversation ? 'Failed to load context breakdown.' : 'Select a conversation to see context breakdown.'}
+              {currentConversation
+                ? 'No breakdown yet — send a message to populate the context.'
+                : 'Select a conversation to see context breakdown.'}
             </Typography>
           )}
         </DialogContent>
