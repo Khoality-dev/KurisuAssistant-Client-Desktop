@@ -52,9 +52,10 @@ export const ConversationsPage: React.FC = () => {
     }
   };
 
+  const mainAgents = agents.filter(a => a.agent_type !== 'sub');
   const filteredAgents = search
-    ? agents.filter(a => a.name.toLowerCase().includes(search.toLowerCase()))
-    : agents;
+    ? mainAgents.filter(a => a.name.toLowerCase().includes(search.toLowerCase()))
+    : mainAgents;
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
