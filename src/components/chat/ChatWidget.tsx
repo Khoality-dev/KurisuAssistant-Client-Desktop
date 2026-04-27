@@ -435,7 +435,6 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ characterWindowOpen = fa
           expandedThinking={streaming.expandedThinking}
           onToggleThinking={streaming.toggleThinking}
           onResend={isCompacted ? undefined : streaming.handleResend}
-          onDelete={streaming.handleDelete}
           searchHighlight={isSearchMatch ? searchQuery : undefined}
           ttsRef={ttsRef}
           isQueueActive={isQueueActive}
@@ -455,7 +454,6 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ characterWindowOpen = fa
     streaming.expandedThinking,
     streaming.toggleThinking,
     streaming.handleResend,
-    streaming.handleDelete,
     compactedUpToId,
     searchQuery,
     searchMatches,
@@ -662,22 +660,42 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ characterWindowOpen = fa
                     {Math.round((breakdownData.total_tokens / breakdownData.context_limit) * 100)}%
                   </Typography>
                 </Box>
-                <LinearProgress
-                  variant="determinate"
-                  value={Math.min(100, (breakdownData.total_tokens / breakdownData.context_limit) * 100)}
-                  sx={{
-                    height: 8,
-                    borderRadius: 1,
-                    backgroundColor: 'action.hover',
-                    '& .MuiLinearProgress-bar': {
-                      backgroundColor: breakdownData.total_tokens > breakdownData.context_limit * 0.9
-                        ? 'error.main'
-                        : breakdownData.total_tokens > breakdownData.context_limit * 0.8
-                        ? 'warning.main'
-                        : 'primary.main',
-                    },
-                  }}
-                />
+                <Box sx={{ position: 'relative' }}>
+                  <LinearProgress
+                    variant="determinate"
+                    value={Math.min(100, (breakdownData.total_tokens / breakdownData.context_limit) * 100)}
+                    sx={{
+                      height: 8,
+                      borderRadius: 1,
+                      backgroundColor: 'action.hover',
+                      '& .MuiLinearProgress-bar': {
+                        backgroundColor: breakdownData.total_tokens > breakdownData.context_limit * 0.9
+                          ? 'error.main'
+                          : breakdownData.total_tokens > breakdownData.context_limit * 0.8
+                          ? 'warning.main'
+                          : 'primary.main',
+                      },
+                    }}
+                  />
+                  <Tooltip title="Auto-compact triggers at 90% of the context window">
+                    <Box
+                      sx={{
+                        position: 'absolute',
+                        top: -2,
+                        bottom: -2,
+                        left: '90%',
+                        width: '2px',
+                        bgcolor: 'warning.main',
+                        cursor: 'help',
+                      }}
+                    />
+                  </Tooltip>
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 0.5 }}>
+                  <Typography variant="caption" color="text.secondary">
+                    Auto-compact at {Math.round(breakdownData.context_limit * 0.9).toLocaleString()} (90%)
+                  </Typography>
+                </Box>
               </Box>
 
               {/* Token breakdown table */}

@@ -109,6 +109,18 @@ const commands: Command[] = [
       return '';
     },
   },
+  {
+    name: 'compact',
+    description: 'Compact this conversation now (summarize older messages)',
+    execute: async (_args, ctx) => {
+      if (!ctx.activeConversationId) {
+        return 'No active conversation';
+      }
+      const { wsManager } = await import('../api/websocket');
+      wsManager.send({ type: 'compact_context', conversation_id: ctx.activeConversationId });
+      return 'Compacting context…';
+    },
+  },
 ];
 
 /**

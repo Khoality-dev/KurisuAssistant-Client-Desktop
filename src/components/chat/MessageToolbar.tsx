@@ -7,39 +7,32 @@ import {
   DataObject as DataObjectIcon,
   Refresh as RefreshIcon,
   ContentCopy as ContentCopyIcon,
-  Delete as DeleteIcon,
 } from '@mui/icons-material';
 
 interface MessageToolbarProps {
   isUser: boolean;
-  hasMessageId: boolean;
   hasRawData: boolean;
   copied: boolean;
   localPlaying: boolean;
-  agentRole?: string;
   modelName?: string;
   onCopy: () => void;
   onTTS: () => void;
   onShowRaw: () => void;
   onResend: (() => void) | undefined;
   onRegenerate: (() => void) | undefined;
-  onDelete: (() => void) | undefined;
 }
 
 export const MessageToolbar: React.FC<MessageToolbarProps> = ({
   isUser,
-  hasMessageId,
   hasRawData,
   copied,
   localPlaying,
-  agentRole,
   modelName,
   onCopy,
   onTTS,
   onShowRaw,
   onResend,
   onRegenerate,
-  onDelete,
 }) => {
   return (
     <Box
@@ -54,10 +47,6 @@ export const MessageToolbar: React.FC<MessageToolbarProps> = ({
         justifyContent: isUser ? 'flex-end' : 'flex-start',
       }}
     >
-      {/* Agent role chip */}
-      {!isUser && agentRole && (
-        <Chip label={agentRole} size="small" variant="outlined" sx={{ height: 20, fontSize: '0.65rem' }} />
-      )}
       {/* Model name chip */}
       {!isUser && modelName && (
         <Chip label={modelName} size="small" variant="outlined" color="info" sx={{ height: 20, fontSize: '0.65rem' }} />
@@ -137,22 +126,6 @@ export const MessageToolbar: React.FC<MessageToolbarProps> = ({
             }}
           >
             <RefreshIcon sx={{ fontSize: 16 }} />
-          </IconButton>
-        </Tooltip>
-      )}
-      {/* Delete */}
-      {hasMessageId && onDelete && (
-        <Tooltip title="Delete from here">
-          <IconButton
-            size="small"
-            onClick={onDelete}
-            sx={{
-              p: 0.5,
-              color: 'text.disabled',
-              '&:hover': { color: 'error.main', backgroundColor: 'action.hover' },
-            }}
-          >
-            <DeleteIcon sx={{ fontSize: 16 }} />
           </IconButton>
         </Tooltip>
       )}

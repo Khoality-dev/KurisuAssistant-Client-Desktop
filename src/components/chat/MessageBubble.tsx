@@ -83,7 +83,6 @@ interface MessageBubbleProps {
   onToggleThinking: (index: number) => void;
   onRegenerate?: (messageIndex: number) => void;
   onResend?: (messageIndex: number) => void;
-  onDelete?: (messageIndex: number) => void;
   searchHighlight?: string;
   ttsRef: React.RefObject<{ speak: (text: string, voice?: string, language?: string, backend?: string, emotionParams?: { emo_audio?: string; emo_alpha?: number; use_emo_text?: boolean }) => Promise<void>; stopTTS: () => void; clearQueue: () => void; isTTSPlaying: boolean; setActiveAgentForTTS: (agentId: number | null) => void }>;
   isQueueActive?: boolean;
@@ -104,7 +103,6 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({
   onToggleThinking,
   onRegenerate,
   onResend,
-  onDelete,
   searchHighlight,
   ttsRef,
   isQueueActive,
@@ -632,18 +630,15 @@ const MessageBubbleComponent: React.FC<MessageBubbleProps> = ({
         {showToolbar && (
           <MessageToolbar
             isUser={isUser}
-            hasMessageId={!!message.id}
             hasRawData={!!message.id}
             copied={copied}
             localPlaying={localPlaying || autoPlaying}
-            agentRole={message.role === 'assistant' ? (message.agent?.name || message.name) || undefined : undefined}
             modelName={message.model_name || undefined}
             onCopy={handleCopy}
             onTTS={handleTTS}
             onShowRaw={handleShowRaw}
             onResend={onResend ? () => onResend(index) : undefined}
             onRegenerate={onRegenerate ? () => onRegenerate(index) : undefined}
-            onDelete={onDelete ? () => onDelete(index) : undefined}
           />
         )}
       </Box>
@@ -675,7 +670,6 @@ function areMessageBubblePropsEqual(prev: MessageBubbleProps, next: MessageBubbl
     prev.consecutive === next.consecutive &&
     prev.searchHighlight === next.searchHighlight &&
     prev.onResend === next.onResend &&
-    prev.onDelete === next.onDelete &&
     prev.ttsRef === next.ttsRef
   );
 }
