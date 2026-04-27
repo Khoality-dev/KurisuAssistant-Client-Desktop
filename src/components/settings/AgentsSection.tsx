@@ -14,7 +14,6 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  Chip,
   Grid,
   Tooltip,
   FormControlLabel,
@@ -26,7 +25,6 @@ import {
   Delete as DeleteIcon,
   Save as SaveIcon,
   Refresh as RefreshIcon,
-  Settings as SettingsIcon,
   FileDownload as ExportIcon,
   FileUpload as ImportIcon,
   SmartToy as AgentIcon,
@@ -454,8 +452,8 @@ export const AgentsSection: React.FC = () => {
               onClick={() => openEditDialog(agent)}
               sx={{
                 position: 'relative',
-                border: agent.is_system ? '2px solid' : '1px solid',
-                borderColor: agent.is_system ? 'secondary.main' : 'divider',
+                border: '1px solid',
+                borderColor: 'divider',
                 opacity: agent.enabled ? 1 : 0.5,
                 cursor: 'pointer',
                 '&:hover': {
@@ -465,16 +463,7 @@ export const AgentsSection: React.FC = () => {
                 transition: 'box-shadow 0.2s, transform 0.2s, opacity 0.2s',
               }}
             >
-              {agent.is_system && (
-                <Chip
-                  label="Built-in"
-                  color="secondary"
-                  size="small"
-                  icon={<SettingsIcon />}
-                  sx={{ position: 'absolute', top: 12, right: 12 }}
-                />
-              )}
-              <CardContent sx={{ pt: 3 }}>
+              <CardContent>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
                   <Avatar
                     src={agent.avatar_uuid ? apiClient.getImageUrl(agent.avatar_uuid) : undefined}
@@ -512,17 +501,21 @@ export const AgentsSection: React.FC = () => {
                 >
                   {agent.system_prompt || 'No system prompt set'}
                 </Typography>
-                <Box sx={{ mt: 2, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                  {agent.model_name && (
-                    <Chip label={agent.model_name} size="small" variant="outlined" />
-                  )}
-                  {agent.provider_type && (
-                    <Chip label={agent.provider_type} size="small" variant="outlined" color="info" />
-                  )}
-                  {agent.trigger_word && (
-                    <Chip label={`"${agent.trigger_word}"`} size="small" variant="outlined" color="success" />
-                  )}
-                </Box>
+                {(agent.model_name || agent.trigger_word || agent.is_system) && (
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ mt: 1.5, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                  >
+                    {[
+                      agent.model_name,
+                      agent.trigger_word ? `"${agent.trigger_word}"` : null,
+                      agent.is_system ? 'System' : null,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </Typography>
+                )}
               </CardContent>
               <CardActions sx={{ justifyContent: 'space-between', px: 2, pb: 2 }}>
                 <Switch
