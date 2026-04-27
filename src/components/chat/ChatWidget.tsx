@@ -480,6 +480,25 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ characterWindowOpen = fa
         </Box>
       )}
 
+      {compactedContext && (
+        <Paper
+          variant="outlined"
+          sx={{
+            mb: 2,
+            p: 2,
+            borderStyle: 'dashed',
+            bgcolor: 'action.hover',
+          }}
+        >
+          <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ display: 'block', mb: 0.5, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+            Continued from earlier conversation
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>
+            {compactedContext}
+          </Typography>
+        </Paper>
+      )}
+
       <AnimatePresence>
         {messageElements}
       </AnimatePresence>
@@ -496,7 +515,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ characterWindowOpen = fa
       ))}
       <div ref={streaming.messagesEndRef} />
     </Box>
-  ), [isLoadingMessages, messageElements, streaming.queuedMessages]);
+  ), [isLoadingMessages, messageElements, streaming.queuedMessages, compactedContext]);
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, height: '100%', position: 'relative' }}>

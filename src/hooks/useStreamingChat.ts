@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { flushSync } from 'react-dom';
-import { wsManager, StreamChunkEvent, DoneEvent, ErrorEvent, ConnectedEvent, ToolApprovalRequestEvent, ContextInfoEvent } from '../api/websocket';
+import { wsManager, StreamChunkEvent, DoneEvent, ErrorEvent, ConnectedEvent, ToolApprovalRequestEvent, ContextInfoEvent, ConversationSwitchedEvent } from '../api/websocket';
 import { useConversationStore } from '../store/conversationStore';
 import { useToolPermissionsStore } from '../store/toolPermissionsStore';
 import { storage } from '../utils/storage';
@@ -579,12 +579,24 @@ export function useStreamingChat({
         }
       }
     };
+    const onConversationSwitched = (e: ConversationSwitchedEvent) => {
+      // Compaction (manual or auto) created a new conversation seeded with
+      // the rolling summary. Update the agent → conversation mapping and
+      // load the new one. The summary will be visible at the top.
+      if (e.agent_id) {
+        storage.setAgentConversationId(e.agent_id, e.new_conversation_id);
+      }
+      void useConversationStore.getState().loadConversation(e.new_conversation_id);
+      setInfoToast('Compacted — opened a new conversation with the summary on top.');
+    };
+
     wsManager.on('stream_chunk', onChunk);
     wsManager.on('done', onDone);
     wsManager.on('error', onError);
     wsManager.on('connected', onConnected);
     wsManager.on('tool_approval_request', onApproval);
     wsManager.on('context_info', onContextInfo);
+    wsManager.on('conversation_switched', onConversationSwitched);
 
     return () => {
       wsManager.off('stream_chunk', onChunk);
@@ -593,6 +605,7 @@ export function useStreamingChat({
       wsManager.off('connected', onConnected);
       wsManager.off('tool_approval_request', onApproval);
       wsManager.off('context_info', onContextInfo);
+      wsManager.off('conversation_switched', onConversationSwitched);
     };
   }, []);
 
