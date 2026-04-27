@@ -324,29 +324,6 @@ export interface VisionResult {
   gestures: VisionGesture[];
 }
 
-// Context breakdown event (token usage details)
-
-export interface ContextBreakdownEvent {
-  type: 'context_breakdown';
-  event_id: string;
-  timestamp: string;
-  conversation_id: number;
-  turn: number;
-  system_prompt_tokens: number;
-  memory_tokens: number;
-  compacted_context_tokens: number;
-  skills_tokens: number;
-  tools_guidance_tokens: number;
-  other_agents_tokens: number;
-  message_history_tokens: number;
-  message_count: number;
-  tool_schemas_tokens: number;
-  tool_count: number;
-  total_tokens: number;
-  context_limit: number;
-  loaded_tools: string[];
-  loaded_skills: string[];
-}
 
 // Media player types
 

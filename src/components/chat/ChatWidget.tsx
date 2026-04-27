@@ -43,6 +43,7 @@ import { useInteractiveASR } from '../../hooks/useInteractiveASR';
 import { useMicStore } from '../../store/micStore';
 import { useAgentStore } from '../../store/agentStore';
 import { useStreamingChat } from '../../hooks/useStreamingChat';
+import { useContextBreakdown } from '../../hooks/useContextBreakdown';
 import { InteractiveCallBar } from '../InteractiveCallBar';
 import { MessageBubble } from './MessageBubble';
 import { SelectionChips } from './SelectionChips';
@@ -153,13 +154,17 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ characterWindowOpen = fa
     pushAgentCharacterConfig,
   });
 
-  // Context breakdown is the latest cached event from streaming — no backend fetch
+  // Context breakdown is computed locally from current stores — no backend
   const agents = useAgentStore((s) => s.agents);
-  const breakdownAgentName = useMemo(() => {
-    const id = currentConversation?.main_agent_id ?? agentId;
-    return agents.find((a) => a.id === id)?.name || '';
-  }, [agents, currentConversation?.main_agent_id, agentId]);
-  const breakdownData = streaming.contextBreakdown;
+  const breakdownAgentId = currentConversation?.main_agent_id ?? agentId;
+  const breakdownAgentName = useMemo(
+    () => agents.find((a) => a.id === breakdownAgentId)?.name || '',
+    [agents, breakdownAgentId],
+  );
+  const breakdownData = useContextBreakdown({
+    agentId: breakdownAgentId,
+    enabled: breakdownDialogOpen,
+  });
 
   // Clear active speaker when TTS queue finishes playing
   useEffect(() => {
