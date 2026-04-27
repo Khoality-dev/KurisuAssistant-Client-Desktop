@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useState } from 'react';
 import {
   Box,
   Typography,
@@ -10,11 +10,17 @@ import {
   DialogActions,
   Switch,
   FormControlLabel,
+  Avatar,
 } from '@mui/material';
-import { Save as SaveIcon } from '@mui/icons-material';
+import {
+  Save as SaveIcon,
+  SmartToy as AgentIcon,
+  PhotoCamera as PhotoCameraIcon,
+} from '@mui/icons-material';
 import { ModelPicker } from '../ModelPicker';
 import { ToolGroupChecklist } from './ToolGroupChecklist';
 import type { ToolGroup } from './ToolGroupChecklist';
+import { apiClient } from '../../api/client';
 
 interface AgentFormData {
   name: string;
@@ -61,6 +67,29 @@ export const AgentEditDialog: React.FC<AgentEditDialogProps> = ({
   onError,
 }) => {
   const isSub = formData.agent_type === 'sub';
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+
+  const handleAvatarClick = () => {
+    if (uploadingAvatar) return;
+    fileInputRef.current?.click();
+  };
+
+  const handleAvatarFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    try {
+      setUploadingAvatar(true);
+      const { image_uuid } = await apiClient.uploadImage(file);
+      setFormData((prev) => ({ ...prev, avatar_uuid: image_uuid }));
+      onSuccess('Avatar uploaded.');
+    } catch (err: any) {
+      onError(err?.response?.data?.detail || err?.message || 'Failed to upload avatar.');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
@@ -73,6 +102,60 @@ export const AgentEditDialog: React.FC<AgentEditDialogProps> = ({
 
       <DialogContent>
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, mt: 1 }}>
+          {!isSub && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 0.5 }}>
+              <Box
+                onClick={handleAvatarClick}
+                sx={{
+                  position: 'relative',
+                  width: 96,
+                  height: 96,
+                  borderRadius: '50%',
+                  cursor: uploadingAvatar ? 'progress' : 'pointer',
+                  '&:hover .avatar-overlay': { opacity: 1 },
+                }}
+              >
+                <Avatar
+                  src={formData.avatar_uuid ? apiClient.getImageUrl(formData.avatar_uuid) : undefined}
+                  sx={{
+                    width: 96,
+                    height: 96,
+                    bgcolor: (t) => (t.palette.mode === 'light' ? '#F3F4F6' : '#262626'),
+                  }}
+                >
+                  {!formData.avatar_uuid && (
+                    <AgentIcon sx={{ fontSize: 40, color: 'text.secondary' }} />
+                  )}
+                </Avatar>
+                <Box
+                  className="avatar-overlay"
+                  sx={{
+                    position: 'absolute',
+                    inset: 0,
+                    borderRadius: '50%',
+                    bgcolor: 'rgba(0, 0, 0, 0.45)',
+                    color: 'white',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    opacity: uploadingAvatar ? 1 : 0,
+                    transition: 'opacity 150ms ease',
+                    pointerEvents: 'none',
+                  }}
+                >
+                  <PhotoCameraIcon fontSize="small" />
+                </Box>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  hidden
+                  onChange={handleAvatarFileChange}
+                />
+              </Box>
+            </Box>
+          )}
+
           <TextField
             label="Name"
             value={formData.name}
