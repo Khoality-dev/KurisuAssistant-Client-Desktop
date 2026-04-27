@@ -76,7 +76,9 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ characterWindowOpen = fa
   const [resumeDialogOpen, setResumeDialogOpen] = useState(false);
   const [resumeLoading, setResumeLoading] = useState(false);
   const [resumeConversations, setResumeConversations] = useState<Conversation[]>([]);
+  const [resumeActiveIdx, setResumeActiveIdx] = useState(0);
   const [agentPickerOpen, setAgentPickerOpen] = useState(false);
+  const [agentActiveIdx, setAgentActiveIdx] = useState(0);
 
   // Message search
   const [searchOpen, setSearchOpen] = useState(false);
@@ -213,18 +215,33 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ characterWindowOpen = fa
     }
   }, [agentId, currentConversation?.id, loadConversation]);
 
-  // Esc closes the resume picker
+  // Reset highlight when the resume picker opens
+  useEffect(() => {
+    if (resumeDialogOpen) setResumeActiveIdx(0);
+  }, [resumeDialogOpen]);
+
+  // Keyboard navigation for the resume picker
   useEffect(() => {
     if (!resumeDialogOpen) return;
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault();
         setResumeDialogOpen(false);
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setResumeActiveIdx((i) => Math.min(i + 1, Math.max(0, resumeConversations.length - 1)));
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setResumeActiveIdx((i) => Math.max(0, i - 1));
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        const conv = resumeConversations[resumeActiveIdx];
+        if (conv) handleResumeSelect(conv);
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [resumeDialogOpen]);
+  }, [resumeDialogOpen, resumeConversations, resumeActiveIdx, handleResumeSelect]);
 
   // /agents slash command opens the agent picker
   useEffect(() => {
@@ -233,19 +250,6 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ characterWindowOpen = fa
     return () => window.removeEventListener('kurisu:open-agent-picker', handler);
   }, []);
 
-  // Esc closes the agent picker
-  useEffect(() => {
-    if (!agentPickerOpen) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        setAgentPickerOpen(false);
-      }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [agentPickerOpen]);
-
   const selectAgent = useAgentStore((s) => s.selectAgent);
   const handleAgentPick = useCallback((id: number) => {
     setAgentPickerOpen(false);
@@ -253,6 +257,42 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ characterWindowOpen = fa
       selectAgent(id);
     }
   }, [selectAgent, storeAgentId]);
+
+  // Main agents are the only selectable ones in the picker — derive once.
+  const pickerMainAgents = useMemo(
+    () => agents.filter((a) => a.agent_type !== 'sub' && a.enabled),
+    [agents],
+  );
+
+  // Reset highlight when the agent picker opens — start on the current agent if any.
+  useEffect(() => {
+    if (!agentPickerOpen) return;
+    const idx = pickerMainAgents.findIndex((a) => a.id === storeAgentId);
+    setAgentActiveIdx(idx >= 0 ? idx : 0);
+  }, [agentPickerOpen, pickerMainAgents, storeAgentId]);
+
+  // Keyboard navigation for the agent picker
+  useEffect(() => {
+    if (!agentPickerOpen) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setAgentPickerOpen(false);
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setAgentActiveIdx((i) => Math.min(i + 1, Math.max(0, pickerMainAgents.length - 1)));
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setAgentActiveIdx((i) => Math.max(0, i - 1));
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        const agent = pickerMainAgents[agentActiveIdx];
+        if (agent) handleAgentPick(agent.id);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [agentPickerOpen, pickerMainAgents, agentActiveIdx, handleAgentPick]);
 
   // Interactive ASR hook
   const asr = useInteractiveASR({
@@ -788,6 +828,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ characterWindowOpen = fa
               <List disablePadding>
                 {resumeConversations.map((conv, idx) => {
                   const isCurrent = conv.id === currentConversation?.id;
+                  const isActive = idx === resumeActiveIdx;
                   const updated = conv.updated_at ? new Date(conv.updated_at).toLocaleString() : '';
                   const preview = conv.last_message?.content?.slice(0, 80) || '';
                   return (
@@ -795,8 +836,16 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ characterWindowOpen = fa
                       {idx > 0 && <Divider component="li" />}
                       <ListItemButton
                         onClick={() => handleResumeSelect(conv)}
+                        onMouseEnter={() => setResumeActiveIdx(idx)}
                         selected={isCurrent}
-                        sx={{ py: 1.25, px: 3 }}
+                        ref={(el) => {
+                          if (isActive && el) el.scrollIntoView({ block: 'nearest' });
+                        }}
+                        sx={{
+                          py: 1.25,
+                          px: 3,
+                          ...(isActive && { bgcolor: 'action.hover' }),
+                        }}
                       >
                         <ListItemText
                           primary={
@@ -849,26 +898,31 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ characterWindowOpen = fa
             </IconButton>
           </Box>
           <Box sx={{ flex: 1, overflowY: 'auto' }}>
-            {(() => {
-              const mainAgents = agents.filter((a) => a.agent_type !== 'sub' && a.enabled);
-              if (mainAgents.length === 0) {
-                return (
-                  <Typography color="text.secondary" sx={{ p: 4, textAlign: 'center' }}>
-                    No main agents available.
-                  </Typography>
-                );
-              }
-              return (
+            {pickerMainAgents.length === 0 ? (
+              <Typography color="text.secondary" sx={{ p: 4, textAlign: 'center' }}>
+                No main agents available.
+              </Typography>
+            ) : (
                 <List disablePadding>
-                  {mainAgents.map((agent, idx) => {
+                  {pickerMainAgents.map((agent, idx) => {
                     const isCurrent = agent.id === storeAgentId;
+                    const isActive = idx === agentActiveIdx;
                     return (
                       <React.Fragment key={agent.id}>
                         {idx > 0 && <Divider component="li" />}
                         <ListItemButton
                           onClick={() => handleAgentPick(agent.id)}
+                          onMouseEnter={() => setAgentActiveIdx(idx)}
                           selected={isCurrent}
-                          sx={{ py: 1.25, px: 3, gap: 1.5 }}
+                          ref={(el) => {
+                            if (isActive && el) el.scrollIntoView({ block: 'nearest' });
+                          }}
+                          sx={{
+                            py: 1.25,
+                            px: 3,
+                            gap: 1.5,
+                            ...(isActive && { bgcolor: 'action.hover' }),
+                          }}
                         >
                           <Avatar
                             src={agent.avatar_uuid ? apiClient.getImageUrl(agent.avatar_uuid) : undefined}
@@ -900,8 +954,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ characterWindowOpen = fa
                     );
                   })}
                 </List>
-              );
-            })()}
+            )}
           </Box>
         </Box>
       )}
