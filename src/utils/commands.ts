@@ -82,6 +82,33 @@ const commands: Command[] = [
       return '';
     },
   },
+  {
+    name: 'refresh',
+    description: 'Reload the current conversation from the server',
+    execute: (_args, ctx) => {
+      if (!ctx.activeConversationId) {
+        return 'No active conversation';
+      }
+      window.dispatchEvent(new Event('kurisu:refresh-conversation'));
+      return 'Reloading…';
+    },
+  },
+  {
+    name: 'live-animate',
+    description: 'Toggle the animated character window',
+    execute: () => {
+      window.dispatchEvent(new Event('kurisu:toggle-character'));
+      return '';
+    },
+  },
+  {
+    name: 'vision',
+    description: 'Toggle the webcam vision pipeline on/off',
+    execute: () => {
+      window.dispatchEvent(new Event('kurisu:toggle-vision'));
+      return '';
+    },
+  },
 ];
 
 /**

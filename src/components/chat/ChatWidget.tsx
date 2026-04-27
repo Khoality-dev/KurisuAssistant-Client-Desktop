@@ -336,17 +336,14 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ characterWindowOpen = fa
     };
   }, []);
 
-  // Vision (camera toggle)
+  // Vision (camera toggle) — driven only by the /vision slash command
   const {
     isActive: cameraActive,
     webcams: cameraWebcams,
-    selectedWebcam: cameraSelectedWebcam,
     loadWebcams: loadCameraWebcams,
     startVision,
     stopVision,
-    setSelectedWebcam: setCameraSelectedWebcam,
   } = useVisionStore();
-  const [cameraMenuAnchor, setCameraMenuAnchor] = useState<HTMLElement | null>(null);
 
   const handleCameraToggle = useCallback(async () => {
     if (cameraActive) {
@@ -357,13 +354,11 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ characterWindowOpen = fa
     }
   }, [cameraActive, cameraWebcams.length, loadCameraWebcams, startVision, stopVision]);
 
-  const handleCameraContext = useCallback((e: React.MouseEvent<HTMLElement>) => {
-    e.preventDefault();
-    const anchor = e.currentTarget;
-    loadCameraWebcams().then(() => {
-      setCameraMenuAnchor(anchor);
-    });
-  }, [loadCameraWebcams]);
+  useEffect(() => {
+    const handler = () => { void handleCameraToggle(); };
+    window.addEventListener('kurisu:toggle-vision', handler);
+    return () => window.removeEventListener('kurisu:toggle-vision', handler);
+  }, [handleCameraToggle]);
 
   // Host tool approval (IPC from Electron main process)
   const [hostApproval, setHostApproval] = useState<{ approvalId: string; request: ApprovalRequest } | null>(null);
@@ -616,19 +611,8 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ characterWindowOpen = fa
           externalDraft={streaming.externalDraft}
           externalDraftVersion={streaming.externalDraftVersion}
           isStreaming={streaming.isStreaming}
-          cameraActive={cameraActive}
-          cameraWebcams={cameraWebcams}
-          cameraSelectedWebcam={cameraSelectedWebcam}
-          cameraMenuAnchor={cameraMenuAnchor}
           onSend={streaming.handleSend}
           onCancel={streaming.handleCancel}
-          onCameraToggle={handleCameraToggle}
-          onCameraContext={handleCameraContext}
-          onCloseCameraMenu={() => setCameraMenuAnchor(null)}
-          onSelectCamera={(camera) => {
-            setCameraSelectedWebcam(camera);
-            setCameraMenuAnchor(null);
-          }}
         />
       )}
       <Snackbar
