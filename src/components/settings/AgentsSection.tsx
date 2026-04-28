@@ -464,7 +464,7 @@ export const AgentsSection: React.FC = () => {
               }}
             >
               <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1, flexWrap: 'wrap' }}>
                   <Avatar
                     src={agent.avatar_uuid ? apiClient.getImageUrl(agent.avatar_uuid) : undefined}
                     sx={{
@@ -478,7 +478,11 @@ export const AgentsSection: React.FC = () => {
                       <AgentIcon sx={{ fontSize: 22, color: 'text.secondary' }} />
                     )}
                   </Avatar>
-                  <Typography variant="h6" sx={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {/* Name: wraps to a new line if the card is too narrow for
+                      avatar + name on one row. wordBreak prevents long names
+                      from staying invisible behind overflow:hidden when the
+                      card collapses to ~120px (Grid md=4 in a narrow panel). */}
+                  <Typography variant="h6" sx={{ minWidth: 0, flex: '1 1 auto', wordBreak: 'break-word' }}>
                     {agent.name}
                   </Typography>
                 </Box>
