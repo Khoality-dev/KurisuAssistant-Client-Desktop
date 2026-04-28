@@ -400,7 +400,20 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ characterWindowOpen = fa
 
   // Message rendering
   const messageElements = useMemo(() => {
-    const combined = [...messages, ...streaming.streamingMessages];
+    // Dedupe by _clientKey across the combined array. handleDone moves
+    // streaming bubbles into `messages` and then clears `streamingMessages`,
+    // but those two updates can land in different React renders on slow CI
+    // (Zustand's useSyncExternalStore notification doesn't reliably batch
+    // with adjacent setState calls). Without dedupe, the brief overlap
+    // renders the same bubble twice and trips strict-mode locator
+    // assertions.
+    const seen = new Set<string>();
+    const combined = [...messages, ...streaming.streamingMessages].filter((m) => {
+      if (!m._clientKey) return true;
+      if (seen.has(m._clientKey)) return false;
+      seen.add(m._clientKey);
+      return true;
+    });
     const displayedCount = messages.length;
     const activeStreamingMsg = streaming.isStreaming && streaming.streamingMessages.length > 0
       ? streaming.streamingMessages[streaming.streamingMessages.length - 1]
