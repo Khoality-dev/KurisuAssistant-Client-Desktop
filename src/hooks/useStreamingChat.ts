@@ -120,11 +120,23 @@ export function useStreamingChat({
   const pendingStreamRef = useRef<{ content: string; thinking: string }>({ content: '', thinking: '' });
   const prevConversationIdRef = useRef<number | null>(null);
 
-  // Mirror of streamingMessages for synchronous reads from event handlers. Kept
-  // outside setState updaters so side effects like appendMessages aren't doubled
-  // by React.StrictMode's updater re-invocation in dev.
+  // Authoritative copy of streamingMessages, kept in lockstep with React state
+  // by `updateStreaming` below. Updating it on render (the previous approach)
+  // was racy: a chunk's setState could be batched and unflushed when the next
+  // chunk's handler — or handleDone — read this ref, returning a stale array
+  // and dropping the in-progress bubble. The ref is the source of truth now;
+  // setStreamingMessages is just a notifier.
   const streamingMessagesRef = useRef<Message[]>([]);
-  streamingMessagesRef.current = streamingMessages;
+  const updateStreaming = useCallback(
+    (updater: Message[] | ((prev: Message[]) => Message[])) => {
+      const next = typeof updater === 'function'
+        ? (updater as (prev: Message[]) => Message[])(streamingMessagesRef.current)
+        : updater;
+      streamingMessagesRef.current = next;
+      setStreamingMessages(next);
+    },
+    [],
+  );
 
   useEffect(() => {
     isStreamingRef.current = isStreaming;
@@ -184,7 +196,7 @@ export function useStreamingChat({
     }
 
     // Clear local streaming state on a real switch.
-    setStreamingMessages([]);
+    updateStreaming([]);
     setStreamingContent('');
     setStreamingThinking('');
     setJustFinishedStreaming(false);
@@ -317,7 +329,7 @@ export function useStreamingChat({
       const previousThinking = state.accumulatedThinking;
 
       // Finalize previous message content and add new bubble
-      setStreamingMessages(prev => {
+      updateStreaming(prev => {
         const updated = [...prev];
         if (updated.length > 0) {
           updated[updated.length - 1] = {
@@ -369,7 +381,7 @@ export function useStreamingChat({
 
       if (state.hasPlaceholder) {
         // Update placeholder with actual role/agent info
-        setStreamingMessages(prev => {
+        updateStreaming(prev => {
           const updated = [...prev];
           if (updated.length > 0) {
             updated[updated.length - 1] = {
@@ -388,7 +400,7 @@ export function useStreamingChat({
         });
         state.hasPlaceholder = false;
       } else {
-        setStreamingMessages(prev => [...prev, {
+        updateStreaming(prev => [...prev, {
           role: messageRole,
           content: '',
           name: agentName,
@@ -414,7 +426,7 @@ export function useStreamingChat({
 
     // Merge images from chunk into current streaming message
     if (event.images && event.images.length > 0) {
-      setStreamingMessages(prev => {
+      updateStreaming(prev => {
         const updated = [...prev];
         if (updated.length > 0) {
           const last = updated[updated.length - 1];
@@ -483,21 +495,24 @@ export function useStreamingChat({
     ttsVoiceRef.current = undefined;    // Do not clear activeAgentId here; TTS may still be playing after streaming ends.
     // activeAgentId is cleared when isQueueActive becomes false (see effect below).
 
-    // Finalize the last streaming message. flushSync commits synchronously so
-    // the post-render ref mirror is up-to-date before we read it. Without this,
-    // the ref can be one render behind if chunks arrived in rapid succession.
-    flushSync(() => {
-      setStreamingMessages(prev => {
-        if (prev.length === 0) return prev;
-        const updated = [...prev];
-        updated[updated.length - 1] = {
-          ...updated[updated.length - 1],
-          content: state.accumulatedContent,
-          thinking: state.accumulatedThinking || undefined,
-        };
-        return updated;
-      });
-    });
+    // Build the finalized array directly from the ref + accumulator instead of
+    // routing it through setStreamingMessages → flushSync → ref. The previous
+    // approach was racy: when a stream chunk arrived microseconds before the
+    // done event (common at the end of a multi-role stream), the ref still
+    // pointed to a render-stale array (3 bubbles instead of 4) and the last
+    // bubble was lost from the store. Computing finalized inline removes the
+    // dependency on render timing entirely.
+    const current = streamingMessagesRef.current;
+    const finalized: Message[] = current.length > 0
+      ? [
+          ...current.slice(0, -1),
+          {
+            ...current[current.length - 1],
+            content: state.accumulatedContent,
+            thinking: state.accumulatedThinking || undefined,
+          },
+        ]
+      : [];
 
     cancelStreamUpdate();
     setStreamingContent('');
@@ -505,15 +520,15 @@ export function useStreamingChat({
     setJustFinishedStreaming(true);
     setIsStreaming(false);
 
-    // Move streaming messages into store, then clear streaming state. Read from
-    // the ref (kept in sync via render assignment) so the side effect runs
-    // exactly once — React.StrictMode re-invokes setState updaters in dev, so
-    // appendMessages must not live inside one.
-    const finalized = streamingMessagesRef.current;
-    if (finalized.length > 0) {
-      useConversationStore.getState().appendMessages(finalized);
-    }
-    setStreamingMessages([]);
+    // Commit the streaming → store handoff atomically so the bubble doesn't
+    // appear in both arrays during an intermediate render (which would render
+    // the message twice and trip a strict-mode locator violation in tests).
+    flushSync(() => {
+      if (finalized.length > 0) {
+        useConversationStore.getState().appendMessages(finalized);
+      }
+      updateStreaming([]);
+    });
     // Drop any queued messages — backend will stream them next.
     setQueuedMessages([]);
 
@@ -529,12 +544,12 @@ export function useStreamingChat({
   const handleError = useCallback((event: ErrorEvent) => {
     console.error('WebSocket error:', event.error);
     setErrorToast(event.error);
-    setStreamingMessages([]);
+    updateStreaming([]);
     cancelStreamUpdate();
     setStreamingContent('');
     setStreamingThinking('');
     setIsStreaming(false);
-  }, []);
+  }, [updateStreaming]);
 
   const handleConnected = useCallback((event: ConnectedEvent) => {
     if (event.chat_active && event.conversation_id) {      // Server still has an active streaming task; enter streaming mode and load
@@ -547,7 +562,7 @@ export function useStreamingChat({
     } else if (!event.chat_active && event.conversation_id) {      // Task finished while we were disconnected; reload once from the database
       const convId = event.conversation_id;
       loadConversation(convId)
-        .then(() => setStreamingMessages([]))
+        .then(() => updateStreaming([]))
         .catch(console.error);
     }
     // If no conversation_id, nothing to restore
@@ -730,7 +745,7 @@ export function useStreamingChat({
       window.electron?.characterWindow?.sendSubtitle({ text, isUser: true });
 
       // Add user message + placeholder to local streaming state (not store)
-      setStreamingMessages([userMessage, { role: 'assistant', content: '', _clientKey: crypto.randomUUID() }]);
+      updateStreaming([userMessage, { role: 'assistant', content: '', _clientKey: crypto.randomUUID() }]);
 
       // Reset streaming state
       streamingStateRef.current = {
@@ -758,7 +773,7 @@ export function useStreamingChat({
       );
     } catch (err: any) {
       console.error('Chat error:', err);
-      setStreamingMessages(prev => {
+      updateStreaming(prev => {
         if (prev.length === 0) return prev;
         const updated = [...prev];
         updated[updated.length - 1] = {
@@ -832,7 +847,7 @@ export function useStreamingChat({
       };
       useConversationStore.getState().appendMessages(updated);
     }
-    setStreamingMessages([]);
+    updateStreaming([]);
 
     setIsStreaming(false);
     cancelStreamUpdate();
