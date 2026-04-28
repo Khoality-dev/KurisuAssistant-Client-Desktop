@@ -5,7 +5,6 @@ import {
   VolumeUp as VolumeUpIcon,
   Stop as StopIcon,
   DataObject as DataObjectIcon,
-  Refresh as RefreshIcon,
   ContentCopy as ContentCopyIcon,
 } from '@mui/icons-material';
 
@@ -18,8 +17,6 @@ interface MessageToolbarProps {
   onCopy: () => void;
   onTTS: () => void;
   onShowRaw: () => void;
-  onResend: (() => void) | undefined;
-  onRegenerate: (() => void) | undefined;
 }
 
 export const MessageToolbar: React.FC<MessageToolbarProps> = ({
@@ -31,8 +28,6 @@ export const MessageToolbar: React.FC<MessageToolbarProps> = ({
   onCopy,
   onTTS,
   onShowRaw,
-  onResend,
-  onRegenerate,
 }) => {
   return (
     <Box
@@ -94,38 +89,6 @@ export const MessageToolbar: React.FC<MessageToolbarProps> = ({
             }}
           >
             <DataObjectIcon sx={{ fontSize: 16 }} />
-          </IconButton>
-        </Tooltip>
-      )}
-      {/* Resend - user messages only */}
-      {isUser && onResend && (
-        <Tooltip title="Resend">
-          <IconButton
-            size="small"
-            onClick={onResend}
-            sx={{
-              p: 0.5,
-              color: 'text.disabled',
-              '&:hover': { color: 'text.secondary', backgroundColor: 'action.hover' },
-            }}
-          >
-            <RefreshIcon sx={{ fontSize: 16 }} />
-          </IconButton>
-        </Tooltip>
-      )}
-      {/* Regenerate - non-user messages only */}
-      {!isUser && onRegenerate && (
-        <Tooltip title="Regenerate">
-          <IconButton
-            size="small"
-            onClick={onRegenerate}
-            sx={{
-              p: 0.5,
-              color: 'text.disabled',
-              '&:hover': { color: 'text.secondary', backgroundColor: 'action.hover' },
-            }}
-          >
-            <RefreshIcon sx={{ fontSize: 16 }} />
           </IconButton>
         </Tooltip>
       )}

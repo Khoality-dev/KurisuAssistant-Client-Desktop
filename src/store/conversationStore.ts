@@ -53,6 +53,39 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
   loadConversation: async (id: number) => {
     const data = await apiClient.getConversation(id, 20, 0);
 
+    // Carry over _clientKey from the previous in-store messages so that
+    // recently-streamed bubbles keep their React identity across the reload.
+    // Match strategy: by id when the id was already present in prev; otherwise
+    // by tail position among messages whose id is *new* in this payload — that
+    // is the just-streamed tail picking up its DB ids.
+    const prev = get().messages;
+    const prevById = new Map<number, string>();
+    const prevIdSet = new Set<number>();
+    const prevUnidentifiedKeys: string[] = [];
+    for (const m of prev) {
+      if (m.id != null) {
+        prevIdSet.add(m.id);
+        if (m._clientKey) prevById.set(m.id, m._clientKey);
+      } else if (m._clientKey) {
+        prevUnidentifiedKeys.push(m._clientKey);
+      }
+    }
+    const trulyNewIdxs: number[] = [];
+    data.messages.forEach((m, i) => {
+      if (m.id == null || !prevIdSet.has(m.id)) trulyNewIdxs.push(i);
+    });
+    const messages = data.messages.map((m, i) => {
+      if (m.id != null) {
+        const k = prevById.get(m.id);
+        if (k) return { ...m, _clientKey: k };
+      }
+      const tailPos = trulyNewIdxs.indexOf(i);
+      if (tailPos !== -1 && tailPos < prevUnidentifiedKeys.length) {
+        return { ...m, _clientKey: prevUnidentifiedKeys[tailPos] };
+      }
+      return m;
+    });
+
     set({
       currentConversation: {
         id,
@@ -62,7 +95,7 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
         created_at: data.created_at,
         updated_at: '',
       },
-      messages: data.messages,
+      messages,
       totalMessages: data.total_messages,
       hasMoreMessages: data.has_more,
       messagesOffset: data.limit,

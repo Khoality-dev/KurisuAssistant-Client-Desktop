@@ -32,6 +32,10 @@ export interface Message {
   tool_status?: string; // "success" | "error" | "denied" (from backend)
   context_files?: Array<{ path: string; fileName: string; startLine?: number; endLine?: number; startColumn?: number; endColumn?: number }>;
   queued?: boolean; // Queued message waiting to be processed
+  // Render-only stable key that survives the transition from streaming → store → DB-id'd reload.
+  // Without it, React keys flip from "stream-X" → "stream--Y" → "msg-Z" and Framer Motion replays
+  // the entry animation on every remount, producing a visible flash when a stream finishes.
+  _clientKey?: string;
 }
 
 export interface MessageRawData {

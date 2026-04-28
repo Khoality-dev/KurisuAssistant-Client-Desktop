@@ -409,11 +409,13 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ characterWindowOpen = fa
 
     combined.forEach((message, index) => {
       const isActiveStreaming = message === activeStreamingMsg;
-      const isCompacted = message.id != null && message.id <= compactedUpToId;
       const prevMessage = index > 0 ? combined[index - 1] : null;
       const consecutive = prevMessage != null && prevMessage.role === message.role;
-      // Stable key: DB messages use their ID, streaming messages use their position in streamingMessages
-      const key = message.id ? `msg-${message.id}` : `stream-${index - displayedCount}`;
+      // Stable key: prefer the per-message _clientKey (assigned to streaming
+      // messages), then DB id (older persisted messages), then a positional
+      // fallback. Without _clientKey persistence the bubble would remount and
+      // replay its entry animation on every state churn.
+      const key = message._clientKey || (message.id ? `msg-${message.id}` : `stream-${index - displayedCount}`);
       const isSearchMatch = searchQuery && searchMatches.includes(index);
       elements.push(
         <Box
@@ -434,7 +436,6 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ characterWindowOpen = fa
           justFinishedStreaming={index === combined.length - 1 && streaming.justFinishedStreaming}
           expandedThinking={streaming.expandedThinking}
           onToggleThinking={streaming.toggleThinking}
-          onResend={isCompacted ? undefined : streaming.handleResend}
           searchHighlight={isSearchMatch ? searchQuery : undefined}
           ttsRef={ttsRef}
           isQueueActive={isQueueActive}
@@ -453,8 +454,6 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ characterWindowOpen = fa
     streaming.justFinishedStreaming,
     streaming.expandedThinking,
     streaming.toggleThinking,
-    streaming.handleResend,
-    compactedUpToId,
     searchQuery,
     searchMatches,
     searchMatchIdx,

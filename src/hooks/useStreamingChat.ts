@@ -7,7 +7,6 @@ import { storage } from '../utils/storage';
 import { stripNarration, fileToBase64 } from '../utils/chat';
 import { useExplorerStore } from '../store/explorerStore';
 import { useAgentStore } from '../store/agentStore';
-import { apiClient } from '../api/client';
 import type { Message } from '../api/types';
 import type { AmplitudeState } from '../videocall/CharacterRenderer';
 import { handleCommand } from '../utils/commands';
@@ -51,8 +50,6 @@ export interface UseStreamingChatReturn {
   handleSendText: (text: string) => Promise<void>;
   handleCancel: () => void;
   toggleThinking: (index: number) => void;
-  handleDelete: (messageIndex: number) => Promise<void>;
-  handleResend: (messageIndex: number) => Promise<void>;
   queuedMessages: Message[];
   pendingApproval: ToolApprovalRequestEvent | null;
   respondToApproval: (approved: boolean) => void;
@@ -114,6 +111,10 @@ export function useStreamingChat({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const previousScrollHeightRef = useRef<number>(0);
+  // Tracks the container's scrollHeight from the previous render so we can decide
+  // whether the user was at the bottom *before* this update. If they were, we keep
+  // them pinned to the bottom; if they had scrolled up, we leave them alone.
+  const lastScrollHeightRef = useRef<number>(0);
   const streamFrameRef = useRef<number | null>(null);
   const scrollFrameRef = useRef<number | null>(null);
   const pendingStreamRef = useRef<{ content: string; thinking: string }>({ content: '', thinking: '' });
@@ -222,12 +223,31 @@ export function useStreamingChat({
     }
   }, [justFinishedStreaming]);
 
-  // Scroll to bottom on new messages
+  // Reset scroll tracking on conversation switch so the new conversation pins
+  // to the bottom on first render (oldHeight=0 → distFromBottom is non-positive).
   useEffect(() => {
-    if (!isLoadingMessages) {
-      messagesEndRef.current?.scrollIntoView({ behavior: isStreaming ? 'auto' : 'smooth' });
+    lastScrollHeightRef.current = 0;
+  }, [currentConversation?.id]);
+
+  // Auto-scroll on streaming/message updates, but only if the user was already
+  // near the bottom of the *previous* content. Always 'auto' — 'smooth' produces
+  // a visible scroll animation when the stream finishes (state flips like
+  // setStreamingMessages([])/setStreamingContent('') and the post-done reload
+  // each retrigger the effect). Note: isStreaming intentionally not in deps —
+  // toggling it shouldn't cause a scroll on its own.
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    const oldHeight = lastScrollHeightRef.current;
+    lastScrollHeightRef.current = container.scrollHeight;
+    if (isLoadingMessages) return;
+    const distFromBottom = oldHeight
+      ? oldHeight - container.scrollTop - container.clientHeight
+      : 0;
+    if (distFromBottom < 100) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
     }
-  }, [messages, streamingMessages, streamingContent, isLoadingMessages, isStreaming]);
+  }, [messages, streamingMessages, streamingContent, isLoadingMessages]);
 
   // Preserve scroll position after loading more messages
   useEffect(() => {
@@ -317,6 +337,7 @@ export function useStreamingChat({
           provider_type: event.provider_type || undefined,
           tool_args: event.tool_args || undefined,
           tool_status: event.tool_status || undefined,
+          _clientKey: crypto.randomUUID(),
         });
         return updated;
       });
@@ -378,6 +399,7 @@ export function useStreamingChat({
           provider_type: event.provider_type || undefined,
           tool_args: event.tool_args || undefined,
           tool_status: event.tool_status || undefined,
+          _clientKey: crypto.randomUUID(),
         }]);
       }
 
@@ -492,18 +514,17 @@ export function useStreamingChat({
       useConversationStore.getState().appendMessages(finalized);
     }
     setStreamingMessages([]);
-    // Clear queued messages (they'll be reloaded from DB after backend processes them)
+    // Drop any queued messages — backend will stream them next.
     setQueuedMessages([]);
 
-    // Background reload for proper message IDs, agent info, has_raw_data
+    // Refresh agent previews (last-message snippet on the sidebar). No
+    // conversation reload: streaming chunks already deliver every field the
+    // bubble needs, and resend/delete/raw-data have been removed, so the
+    // missing DB ids are no longer load-bearing on the client.
     if (event.conversation_id) {
-      const convId = event.conversation_id;
-      setTimeout(() => {
-        loadConversation(convId).catch(console.error);
-        useAgentStore.getState().loadAgentPreviews();
-      }, 500);
+      useAgentStore.getState().loadAgentPreviews();
     }
-  }, [loadConversation, queueText]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [queueText]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleError = useCallback((event: ErrorEvent) => {
     console.error('WebSocket error:', event.error);
@@ -702,13 +723,14 @@ export function useStreamingChat({
         content: text,
         images: [],
         context_files: contextFiles.length > 0 ? contextFiles as Message['context_files'] : undefined,
+        _clientKey: crypto.randomUUID(),
       };
 
       // Send user text as subtitle
       window.electron?.characterWindow?.sendSubtitle({ text, isUser: true });
 
       // Add user message + placeholder to local streaming state (not store)
-      setStreamingMessages([userMessage, { role: 'assistant', content: '' }]);
+      setStreamingMessages([userMessage, { role: 'assistant', content: '', _clientKey: crypto.randomUUID() }]);
 
       // Reset streaming state
       streamingStateRef.current = {
@@ -765,7 +787,7 @@ export function useStreamingChat({
 
     if (isStreamingRef.current) {
       // Already streaming — queue: show dimmed user bubble below streaming content
-      setQueuedMessages(prev => [...prev, { role: 'user', content: trimmed, images: [], queued: true }]);
+      setQueuedMessages(prev => [...prev, { role: 'user', content: trimmed, images: [], queued: true, _clientKey: crypto.randomUUID() }]);
 
       const imageBase64: string[] = [];
       for (const imageFile of imageFiles) {
@@ -817,14 +839,6 @@ export function useStreamingChat({
     setStreamingContent('');
     setStreamingThinking('');
     setQueuedMessages([]);
-
-    // Background reload for proper message IDs
-    const convId = streamingStateRef.current.conversationId;
-    if (convId) {
-      setTimeout(() => {
-        loadConversation(convId).catch(console.error);
-      }, 500);
-    }
   };
 
   const toggleThinking = useCallback((index: number) => {
@@ -838,66 +852,6 @@ export function useStreamingChat({
       return newSet;
     });
   }, []);
-
-  const handleDelete = useCallback(async (messageIndex: number) => {
-    const combined = [...messages, ...streamingMessages];
-    const message = combined[messageIndex];
-    if (!message?.id || !activeConversationId) return;
-
-    try {
-      await apiClient.deleteMessage(message.id);
-      await loadConversation(activeConversationId);
-    } catch (e) {
-      console.error('Failed to delete message:', e);
-    }
-  }, [messages, streamingMessages, activeConversationId, loadConversation]);
-
-  const handleResend = useCallback(async (messageIndex: number) => {
-    if (isStreaming) return;
-
-    const combined = [...messages, ...streamingMessages];
-    const message = combined[messageIndex];
-    if (!message?.id || message.role !== 'user' || !activeConversationId) return;
-
-    const text = message.content;
-    const contextFiles = message.context_files || [];
-
-    try {
-      // Delete from this message onward
-      await apiClient.deleteMessage(message.id);
-      await loadConversation(activeConversationId);
-
-      // Re-send the same text with original context files
-      cancelledRef.current = false;
-      setIsStreaming(true);
-      clearQueue();
-      ttsBufferRef.current = '';
-      ttsVoiceRef.current = undefined;
-
-      const userMessage: Message = { role: 'user', content: text, images: [], context_files: contextFiles.length > 0 ? contextFiles : undefined };
-      setStreamingMessages([userMessage, { role: 'assistant', content: '' }]);
-
-      streamingStateRef.current = {
-        currentRole: null,
-        currentAgentId: undefined,
-        currentAgentName: undefined,
-        accumulatedContent: '',
-        accumulatedThinking: '',
-        hasPlaceholder: true,
-        hasStarted: false,
-        conversationId: activeConversationId,
-      };
-
-      setStreamingContent('');
-      setStreamingThinking('');
-      setJustFinishedStreaming(false);
-
-      await wsManager.sendChatRequest(text, '', activeConversationId, [], contextFiles);
-    } catch (e) {
-      console.error('Failed to resend message:', e);
-      setIsStreaming(false);
-    }
-  }, [isStreaming, messages, streamingMessages, activeConversationId, loadConversation, clearQueue, agentId]);
 
   /**
    * Respond to a tool approval request.
@@ -944,8 +898,6 @@ export function useStreamingChat({
     handleSendText,
     handleCancel,
     toggleThinking,
-    handleDelete,
-    handleResend,
     queuedMessages,
     pendingApproval,
     respondToApproval,
