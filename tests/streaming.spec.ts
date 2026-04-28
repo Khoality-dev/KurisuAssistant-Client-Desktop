@@ -149,8 +149,8 @@ test.describe('streaming', () => {
   });
 
   test('assistant text and tool output both render when a tool call interrupts', async ({ page, mock }) => {
-    // Slow stream so the split-per-role rendering is observable before the
-    // backend's post-done reload can re-concatenate same-role chunks.
+    // Slow stream so the split-per-role rendering (assistant → tool → assistant)
+    // produces three distinct bubbles instead of being collapsed into one.
     mock.setStream({
       chunks: [
         { content: 'Let me check. ', role: 'assistant', delayMs: 150 },
@@ -162,9 +162,16 @@ test.describe('streaming', () => {
     await login(page);
     await send(page, 'tool demo');
 
-    // Wait for the full stream to render (pre-reload window).
+    // Both assistant bubbles render their content inline.
     await expect(page.getByText('Let me check.').first()).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText(/\{"result":"42"\}/).first()).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText('The result is 42.').first()).toBeVisible({ timeout: 10_000 });
+
+    // The tool bubble is collapsed by default — its header "Tool" is visible,
+    // but the JSON payload only renders after the user clicks to expand.
+    const toolHeader = page.getByText('Tool', { exact: true }).first();
+    await expect(toolHeader).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText('{"result":"42"}')).toHaveCount(0);
+    await toolHeader.click();
+    await expect(page.getByText('{"result":"42"}').first()).toBeVisible({ timeout: 5_000 });
   });
 });
