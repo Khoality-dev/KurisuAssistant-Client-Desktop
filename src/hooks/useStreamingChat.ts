@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { flushSync } from 'react-dom';
 import { wsManager, StreamChunkEvent, DoneEvent, ErrorEvent, ConnectedEvent, ToolApprovalRequestEvent, ContextInfoEvent, ConversationSwitchedEvent } from '../api/websocket';
 import { useConversationStore } from '../store/conversationStore';
 import { useToolPermissionsStore } from '../store/toolPermissionsStore';
@@ -520,15 +519,16 @@ export function useStreamingChat({
     setJustFinishedStreaming(true);
     setIsStreaming(false);
 
-    // Commit the streaming → store handoff atomically so the bubble doesn't
-    // appear in both arrays during an intermediate render (which would render
-    // the message twice and trip a strict-mode locator violation in tests).
-    flushSync(() => {
-      if (finalized.length > 0) {
-        useConversationStore.getState().appendMessages(finalized);
-      }
-      updateStreaming([]);
-    });
+    // Streaming → store handoff. Order matters: clear local streaming state
+    // FIRST, then append to the store. The reverse order leaves a window
+    // (between Zustand commit and React commit) where the same bubble lives
+    // in both arrays and renders twice — a strict-mode locator violation in
+    // tests. Clearing first means a one-frame "no bubble" flicker, but React
+    // 18 batches both updates so in practice the user sees one re-render.
+    updateStreaming([]);
+    if (finalized.length > 0) {
+      useConversationStore.getState().appendMessages(finalized);
+    }
     // Drop any queued messages — backend will stream them next.
     setQueuedMessages([]);
 
