@@ -1,3 +1,5 @@
+> **Archived.** This repository was the release channel for the Desktop client. The code and the releases now live in [Khoality-dev/KurisuAssistant](https://github.com/Khoality-dev/KurisuAssistant) — see its [releases](https://github.com/Khoality-dev/KurisuAssistant/releases). Nothing here changes any more.
+
 # Kurisu Assistant — Desktop Client
 
 Desktop client for [KurisuAssistant](https://github.com/Khoality-dev/KurisuAssistant) built with React, Electron, TypeScript, and Material-UI.
